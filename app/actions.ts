@@ -20,27 +20,25 @@ export async function sendVerificationCode(phone: string) {
 }
 
 // 2. Register Customer
-export async function registerCustomer(phone: string, code: string, name: string) {
-  // Verify code
-  const validCode = await prisma.verificationCode.findFirst({
-    where: { phone, code, expiresAt: { gt: new Date() } },
-    orderBy: { createdAt: 'desc' }
-  });
-
-  if (!validCode) {
-    return { success: false, message: 'Invalid or expired code' };
+export async function registerCustomer(username: string, password: string, name: string) {
+  // Validate username length
+  if (username.length < 3 || username.length > 10) {
+    return { success: false, message: 'Username must be between 3 and 10 characters' };
   }
 
   // Check if exists
-  const existing = await prisma.user.findUnique({ where: { phone } });
+  const existing = await prisma.user.findUnique({ where: { username } });
   if (existing) {
-    return { success: false, message: 'Phone already registered' };
+    return { success: false, message: 'Username already taken' };
   }
+
+  const hashedPassword = await bcrypt.hash(password, 10);
 
   const user = await prisma.user.create({
     data: {
       name,
-      phone,
+      username,
+      password: hashedPassword,
       role: 'CUSTOMER'
     }
   });
@@ -49,20 +47,20 @@ export async function registerCustomer(phone: string, code: string, name: string
 }
 
 // 3. Login Customer
-export async function loginCustomer(phone: string, code: string) {
-  // Verify code
-  const validCode = await prisma.verificationCode.findFirst({
-    where: { phone, code, expiresAt: { gt: new Date() } },
-    orderBy: { createdAt: 'desc' }
-  });
-
-  if (!validCode) {
-    return { success: false, message: 'Invalid or expired code' };
+export async function loginCustomer(username: string, password: string) {
+  const user = await prisma.user.findUnique({ where: { username } });
+  if (!user || !user.password) {
+    return { success: false, message: 'Invalid credentials' };
   }
 
-  const user = await prisma.user.findUnique({ where: { phone } });
-  if (!user) {
-    return { success: false, message: 'User not found' };
+  // Check if user is actually a customer
+  if (user.role !== 'CUSTOMER') {
+     return { success: false, message: 'Not a customer account' };
+  }
+
+  const match = await bcrypt.compare(password, user.password);
+  if (!match) {
+    return { success: false, message: 'Invalid credentials' };
   }
 
   return { success: true, user };

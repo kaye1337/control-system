@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/components/LanguageContext';
-import { sendVerificationCode, loginCustomer, registerCustomer, loginStaff } from './actions';
+import { loginCustomer, registerCustomer, loginStaff } from './actions';
 
 export default function HomeClient() {
   const { t } = useLanguage();
@@ -14,20 +14,12 @@ export default function HomeClient() {
   const [selectedRole, setSelectedRole] = useState<'customer' | 'admin' | 'waiter' | null>(null);
   
   // Form States
-  const [phone, setPhone] = useState('');
-  const [code, setCode] = useState('');
   const [name, setName] = useState(''); // for register
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState('');
-
-  const handleSendCode = async () => {
-    if (!phone) return alert('Please enter phone number');
-    const res = await sendVerificationCode(phone);
-    alert(res.message);
-  };
 
   const handleCustomerSubmit = async () => {
     setLoading(true);
@@ -36,9 +28,9 @@ export default function HomeClient() {
       let res;
       // If we are in registerForm view, register. If in loginForm (and role is customer), login.
       if (view === 'registerForm') {
-        res = await registerCustomer(phone, code, name);
+        res = await registerCustomer(username, password, name);
       } else {
-        res = await loginCustomer(phone, code);
+        res = await loginCustomer(username, password);
       }
 
       if (res.success && res.user) {
@@ -149,71 +141,33 @@ export default function HomeClient() {
 
       {msg && <div className="mb-4 p-3 bg-red-100 text-red-700 rounded text-center text-sm">{msg}</div>}
 
-      {selectedRole === 'customer' ? (
-        <div className="flex flex-col gap-4">
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">{t('auth.phone')}</label>
-            <div className="flex gap-2">
-              <input 
-                type="text" 
-                className="flex-1 border rounded p-2 focus:ring-2 focus:ring-blue-500 outline-none"
-                value={phone}
-                onChange={e => setPhone(e.target.value)}
-              />
-              <button 
-                onClick={handleSendCode}
-                className="bg-gray-200 text-gray-700 px-3 py-2 rounded text-sm hover:bg-gray-300 whitespace-nowrap"
-              >
-                {t('auth.sendCode')}
-              </button>
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">{t('auth.code')}</label>
-            <input 
-              type="text" 
-              className="w-full border rounded p-2 focus:ring-2 focus:ring-blue-500 outline-none"
-              value={code}
-              onChange={e => setCode(e.target.value)}
-            />
-          </div>
-          <button 
-            onClick={handleCustomerSubmit}
-            disabled={loading}
-            className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:opacity-50 mt-2"
-          >
-            {loading ? '...' : t('auth.login')}
-          </button>
+      <div className="flex flex-col gap-4">
+        <div>
+          <label className="block text-sm text-gray-600 mb-1">{t('auth.username')}</label>
+          <input 
+            type="text" 
+            className="w-full border rounded p-2 focus:ring-2 focus:ring-blue-500 outline-none"
+            value={username}
+            onChange={e => setUsername(e.target.value)}
+          />
         </div>
-      ) : (
-        <div className="flex flex-col gap-4">
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">{t('auth.username')}</label>
-            <input 
-              type="text" 
-              className="w-full border rounded p-2 focus:ring-2 focus:ring-blue-500 outline-none"
-              value={username}
-              onChange={e => setUsername(e.target.value)}
-            />
-          </div>
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">{t('auth.password')}</label>
-            <input 
-              type="password" 
-              className="w-full border rounded p-2 focus:ring-2 focus:ring-blue-500 outline-none"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-            />
-          </div>
-          <button 
-            onClick={handleStaffSubmit}
-            disabled={loading}
-            className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:opacity-50 mt-2"
-          >
-            {loading ? '...' : t('auth.login')}
-          </button>
+        <div>
+          <label className="block text-sm text-gray-600 mb-1">{t('auth.password')}</label>
+          <input 
+            type="password" 
+            className="w-full border rounded p-2 focus:ring-2 focus:ring-blue-500 outline-none"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+          />
         </div>
-      )}
+        <button 
+          onClick={selectedRole === 'customer' ? handleCustomerSubmit : handleStaffSubmit}
+          disabled={loading}
+          className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:opacity-50 mt-2"
+        >
+          {loading ? '...' : t('auth.login')}
+        </button>
+      </div>
 
       <button 
         onClick={() => setView('roleSelect')}
@@ -241,29 +195,24 @@ export default function HomeClient() {
           />
         </div>
         <div>
-          <label className="block text-sm text-gray-600 mb-1">{t('auth.phone')}</label>
-          <div className="flex gap-2">
-            <input 
-              type="text" 
-              className="flex-1 border rounded p-2 focus:ring-2 focus:ring-blue-500 outline-none"
-              value={phone}
-              onChange={e => setPhone(e.target.value)}
-            />
-            <button 
-              onClick={handleSendCode}
-              className="bg-gray-200 text-gray-700 px-3 py-2 rounded text-sm hover:bg-gray-300 whitespace-nowrap"
-            >
-              {t('auth.sendCode')}
-            </button>
-          </div>
-        </div>
-        <div>
-          <label className="block text-sm text-gray-600 mb-1">{t('auth.code')}</label>
+          <label className="block text-sm text-gray-600 mb-1">
+            {t('auth.username')} 
+            <span className="text-xs text-gray-400 ml-2">({t('auth.usernameHint')})</span>
+          </label>
           <input 
             type="text" 
             className="w-full border rounded p-2 focus:ring-2 focus:ring-blue-500 outline-none"
-            value={code}
-            onChange={e => setCode(e.target.value)}
+            value={username}
+            onChange={e => setUsername(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="block text-sm text-gray-600 mb-1">{t('auth.password')}</label>
+          <input 
+            type="password" 
+            className="w-full border rounded p-2 focus:ring-2 focus:ring-blue-500 outline-none"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
           />
         </div>
         <button 
