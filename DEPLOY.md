@@ -12,7 +12,8 @@
 2. 在本地项目根目录打开终端，运行以下命令提交代码：
    ```bash
    git init
-   git add .
+   git add .  
+
    git commit -m "Initial commit"
    git branch -M main
    git remote add origin https://github.com/你的用户名/仓库名.git
