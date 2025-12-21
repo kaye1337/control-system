@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  role      String   // "BOSS", "CUSTOMER", "WAITER"
+  createdAt DateTime @default(now())
+
+  // Auth
+  phone     String?  @unique // For Customer
+  username  String?  @unique // For Boss/Waiter
+  password  String?  // For Boss/Waiter (hashed)
+
+  // Relationships
+  waiterProfile WaiterProfile?
+  
+  appointmentsAsCustomer Appointment[] @relation("CustomerAppointments")
+  appointmentsAsWaiter   Appointment[] @relation("WaiterAppointments")
+}
+
+model VerificationCode {
+  id        String   @id @default(uuid())
+  phone     String
+  code      String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model WaiterProfile {
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id])
+  status String @default("IDLE") // "IDLE", "BUSY"
+  
+  schedules Schedule[]
+  workLogs  WorkLog[]
+}
+
+model Appointment {
+  id         String   @id @default(uuid())
+  customerId String
+  waiterId   String?
+  
+  customer   User     @relation("CustomerAppointments", fields: [customerId], references: [id])
+  waiter     User?    @relation("WaiterAppointments", fields: [waiterId], references: [id])
+  
+  startTime  DateTime
+  endTime    DateTime
+  status     String   @default("PENDING") // PENDING, APPROVED, REJECTED, CANCELLED
+  message    String?
+  
+  createdAt  DateTime @default(now())
+}
+
+model Schedule {
+  id              String        @id @default(uuid())
+  waiterProfileId String
+  waiterProfile   WaiterProfile @relation(fields: [waiterProfileId], references: [id])
+  startTime       DateTime
+  endTime         DateTime
+}
+
+model WorkLog {
+  id              String        @id @default(uuid())
+  waiterProfileId String
+  waiterProfile   WaiterProfile @relation(fields: [waiterProfileId], references: [id])
+  startTime       DateTime
+  endTime         DateTime?
+}
