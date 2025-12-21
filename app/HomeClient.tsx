@@ -39,7 +39,8 @@ export default function HomeClient() {
         setMsg(res.message || 'Error');
       }
     } catch (e) {
-      setMsg('Error');
+      console.error(e);
+      setMsg(e instanceof Error ? e.message : 'An unexpected error occurred');
     }
     setLoading(false);
   };

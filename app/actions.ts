@@ -21,29 +21,34 @@ export async function sendVerificationCode(phone: string) {
 
 // 2. Register Customer
 export async function registerCustomer(username: string, password: string, name: string) {
-  // Validate username length
-  if (username.length < 3 || username.length > 10) {
-    return { success: false, message: 'Username must be between 3 and 10 characters' };
-  }
-
-  // Check if exists
-  const existing = await prisma.user.findUnique({ where: { username } });
-  if (existing) {
-    return { success: false, message: 'Username already taken' };
-  }
-
-  const hashedPassword = await bcrypt.hash(password, 10);
-
-  const user = await prisma.user.create({
-    data: {
-      name,
-      username,
-      password: hashedPassword,
-      role: 'CUSTOMER'
+  try {
+    // Validate username length
+    if (username.length < 3 || username.length > 10) {
+      return { success: false, message: 'Username must be between 3 and 10 characters' };
     }
-  });
 
-  return { success: true, user };
+    // Check if exists
+    const existing = await prisma.user.findUnique({ where: { username } });
+    if (existing) {
+      return { success: false, message: 'Username already taken' };
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const user = await prisma.user.create({
+      data: {
+        name,
+        username,
+        password: hashedPassword,
+        role: 'CUSTOMER'
+      }
+    });
+
+    return { success: true, user };
+  } catch (error) {
+    console.error('Registration Error:', error);
+    return { success: false, message: 'System Error: ' + (error instanceof Error ? error.message : String(error)) };
+  }
 }
 
 // 3. Login Customer
