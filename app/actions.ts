@@ -3,6 +3,8 @@
 import prisma from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import bcrypt from 'bcryptjs';
+import { cookies } from 'next/headers';
+import { encrypt } from '@/lib/auth';
 
 // --- Auth / User Management ---
 
