@@ -32,7 +32,7 @@ export async function registerUser(username: string, password: string, name: str
 
     return { success: true, message: 'Registration request sent. Please wait for admin approval.', user };
   } catch (error) {
-    console.error('Registration Error:', error);
+    console.error('Registration Error (注册错误):', error);
     return { success: false, message: 'System Error: ' + (error instanceof Error ? error.message : String(error)) };
   }
 }
@@ -40,24 +40,30 @@ export async function registerUser(username: string, password: string, name: str
 // 2. Login
 export async function loginUser(username: string, password: string) {
   try {
+    console.log(`Attempting login for user (尝试登录用户): ${username}`);
     const user = await prisma.user.findUnique({ where: { username } });
     if (!user) {
+      console.log('User not found (用户未找到)');
       return { success: false, message: 'Invalid credentials' };
     }
 
     const match = await bcrypt.compare(password, user.password);
     if (!match) {
+      console.log('Password mismatch (密码不匹配)');
       return { success: false, message: 'Invalid credentials' };
     }
 
     if (user.status !== 'APPROVED') {
+      console.log(`User status (用户状态): ${user.status}`);
       return { success: false, message: `Account is ${user.status}. Please contact admin.` };
     }
 
-    return { success: true, user };
+    // Do not return password field
+    const { password: _, ...safeUser } = user;
+    return { success: true, user: safeUser };
   } catch (error) {
-    console.error('Login Error:', error);
-    return { success: false, message: 'Login failed' };
+    console.error('Login Error (登录错误):', error);
+    return { success: false, message: 'Login failed: ' + (error instanceof Error ? error.message : String(error)) };
   }
 }
 
@@ -113,7 +119,7 @@ export async function ensureSeed() {
       } 
     });
 
-    console.log('Seeded default admin: admin / admin123');
+    console.log('Seeded default admin (已创建默认管理员): admin / admin123');
   }
 }
 

@@ -47,8 +47,8 @@ export default function HomeClient() {
         setMsg(res.message || t('auth.failed'));
       }
     } catch (e) {
-      console.error(e);
-      setMsg(e instanceof Error ? e.message : 'An unexpected error occurred');
+      console.error('Login/Register Exception:', e);
+      setMsg('System Error: ' + (e instanceof Error ? e.message : JSON.stringify(e)));
     }
     setLoading(false);
   };
