@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/components/LanguageContext';
-import { loginCustomer, registerCustomer, loginStaff } from './actions';
+import { loginUser, registerUser } from './actions';
 
 export default function HomeClient() {
   const { t } = useLanguage();
@@ -11,7 +11,7 @@ export default function HomeClient() {
   
   type ViewState = 'intro' | 'roleSelect' | 'loginForm' | 'registerForm';
   const [view, setView] = useState<ViewState>('intro');
-  const [selectedRole, setSelectedRole] = useState<'customer' | 'admin' | 'waiter' | null>(null);
+  const [selectedRole, setSelectedRole] = useState<'MEMBER' | 'ADMIN' | null>(null);
   
   // Form States
   const [name, setName] = useState(''); // for register
@@ -21,22 +21,30 @@ export default function HomeClient() {
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState('');
 
-  const handleCustomerSubmit = async () => {
+  const handleSubmit = async () => {
     setLoading(true);
     setMsg('');
     try {
       let res;
-      // If we are in registerForm view, register. If in loginForm (and role is customer), login.
       if (view === 'registerForm') {
-        res = await registerCustomer(username, password, name);
+        res = await registerUser(username, password, name);
+        if (res.success) {
+          setMsg(t('auth.pending'));
+          setLoading(false);
+          return;
+        }
       } else {
-        res = await loginCustomer(username, password);
+        res = await loginUser(username, password);
       }
 
       if (res.success && res.user) {
-        router.push(`/customer?id=${res.user.id}`);
+        if (res.user.role === 'ADMIN') {
+           router.push(`/admin`);
+        } else {
+           router.push(`/diary`);
+        }
       } else {
-        setMsg(res.message || 'Error');
+        setMsg(res.message || t('auth.failed'));
       }
     } catch (e) {
       console.error(e);
@@ -45,54 +53,23 @@ export default function HomeClient() {
     setLoading(false);
   };
 
-  const handleStaffSubmit = async () => {
-    setLoading(true);
-    setMsg('');
-    try {
-      const res = await loginStaff(username, password);
-      if (res.success && res.user) {
-        if (selectedRole === 'admin' && res.user.role !== 'BOSS') {
-           setMsg('Not authorized as Admin');
-           setLoading(false);
-           return;
-        }
-        if (selectedRole === 'waiter' && res.user.role !== 'WAITER') {
-           setMsg('Not authorized as Waiter');
-           setLoading(false);
-           return;
-        }
-
-        if (res.user.role === 'BOSS') {
-          router.push(`/boss?id=${res.user.id}`);
-        } else {
-          router.push(`/waiter?id=${res.user.id}`);
-        }
-      } else {
-        setMsg(res.message || 'Error');
-      }
-    } catch (e) {
-      setMsg('Error');
-    }
-    setLoading(false);
-  };
-
   // Render Helpers
   const renderIntro = () => (
     <div className="w-full max-w-4xl bg-white rounded-xl shadow-lg overflow-hidden flex flex-col">
-      <div className="p-8 bg-gradient-to-r from-blue-500 to-purple-600 text-white text-center">
+      <div className="p-8 bg-gradient-to-r from-pink-400 to-rose-500 text-white text-center">
         <h2 className="text-3xl font-bold mb-4">{t('home.introTitle')}</h2>
         <p className="text-lg opacity-90">{t('home.introText')}</p>
       </div>
       <div className="p-8 flex justify-center gap-6 bg-gray-50">
         <button 
           onClick={() => setView('roleSelect')}
-          className="px-8 py-3 bg-blue-600 text-white text-lg rounded-lg shadow hover:bg-blue-700 transition"
+          className="px-8 py-3 bg-rose-500 text-white text-lg rounded-lg shadow hover:bg-rose-600 transition"
         >
           {t('home.login')}
         </button>
         <button 
           onClick={() => setView('registerForm')}
-          className="px-8 py-3 bg-white text-blue-600 border-2 border-blue-600 text-lg rounded-lg shadow hover:bg-blue-50 transition"
+          className="px-8 py-3 bg-white text-rose-500 border-2 border-rose-500 text-lg rounded-lg shadow hover:bg-rose-50 transition"
         >
           {t('home.register')}
         </button>
@@ -105,22 +82,16 @@ export default function HomeClient() {
       <h3 className="text-2xl font-bold text-center mb-6">{t('auth.selectRole')}</h3>
       <div className="flex flex-col gap-4">
         <button 
-          onClick={() => { setSelectedRole('customer'); setView('loginForm'); }}
-          className="p-4 border-2 border-blue-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition flex items-center justify-center text-lg font-semibold text-blue-800"
+          onClick={() => { setSelectedRole('MEMBER'); setView('loginForm'); }}
+          className="p-4 border-2 border-rose-100 rounded-lg hover:border-rose-500 hover:bg-rose-50 transition flex items-center justify-center text-lg font-semibold text-rose-800"
         >
-          {t('auth.roleCustomer')}
+          {t('auth.roleMember')}
         </button>
         <button 
-          onClick={() => { setSelectedRole('admin'); setView('loginForm'); }}
-          className="p-4 border-2 border-purple-100 rounded-lg hover:border-purple-500 hover:bg-purple-50 transition flex items-center justify-center text-lg font-semibold text-purple-800"
+          onClick={() => { setSelectedRole('ADMIN'); setView('loginForm'); }}
+          className="p-4 border-2 border-gray-100 rounded-lg hover:border-gray-500 hover:bg-gray-50 transition flex items-center justify-center text-lg font-semibold text-gray-800"
         >
           {t('auth.roleAdmin')}
-        </button>
-        <button 
-          onClick={() => { setSelectedRole('waiter'); setView('loginForm'); }}
-          className="p-4 border-2 border-green-100 rounded-lg hover:border-green-500 hover:bg-green-50 transition flex items-center justify-center text-lg font-semibold text-green-800"
-        >
-          {t('auth.roleWaiter')}
         </button>
       </div>
       <button 
@@ -135,9 +106,8 @@ export default function HomeClient() {
   const renderLoginForm = () => (
     <div className="w-full max-w-md bg-white rounded-xl shadow-lg p-8">
       <h3 className="text-2xl font-bold text-center mb-6">
-        {selectedRole === 'customer' && t('auth.roleCustomer')}
-        {selectedRole === 'admin' && t('auth.roleAdmin')}
-        {selectedRole === 'waiter' && t('auth.roleWaiter')}
+        {selectedRole === 'MEMBER' && t('auth.roleMember')}
+        {selectedRole === 'ADMIN' && t('auth.roleAdmin')}
       </h3>
 
       {msg && <div className="mb-4 p-3 bg-red-100 text-red-700 rounded text-center text-sm">{msg}</div>}
@@ -147,7 +117,7 @@ export default function HomeClient() {
           <label className="block text-sm text-gray-600 mb-1">{t('auth.username')}</label>
           <input 
             type="text" 
-            className="w-full border rounded p-2 focus:ring-2 focus:ring-blue-500 outline-none"
+            className="w-full border rounded p-2 focus:ring-2 focus:ring-rose-500 outline-none"
             value={username}
             onChange={e => setUsername(e.target.value)}
           />
@@ -156,15 +126,15 @@ export default function HomeClient() {
           <label className="block text-sm text-gray-600 mb-1">{t('auth.password')}</label>
           <input 
             type="password" 
-            className="w-full border rounded p-2 focus:ring-2 focus:ring-blue-500 outline-none"
+            className="w-full border rounded p-2 focus:ring-2 focus:ring-rose-500 outline-none"
             value={password}
             onChange={e => setPassword(e.target.value)}
           />
         </div>
         <button 
-          onClick={selectedRole === 'customer' ? handleCustomerSubmit : handleStaffSubmit}
+          onClick={handleSubmit}
           disabled={loading}
-          className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:opacity-50 mt-2"
+          className="w-full bg-rose-500 text-white py-2 rounded hover:bg-rose-600 disabled:opacity-50 mt-2"
         >
           {loading ? '...' : t('auth.login')}
         </button>
@@ -183,14 +153,14 @@ export default function HomeClient() {
     <div className="w-full max-w-md bg-white rounded-xl shadow-lg p-8">
       <h3 className="text-2xl font-bold text-center mb-6">{t('auth.register')}</h3>
       
-      {msg && <div className="mb-4 p-3 bg-red-100 text-red-700 rounded text-center text-sm">{msg}</div>}
+      {msg && <div className={`mb-4 p-3 rounded text-center text-sm ${msg === t('auth.pending') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{msg}</div>}
 
       <div className="flex flex-col gap-4">
         <div>
           <label className="block text-sm text-gray-600 mb-1">{t('auth.name')}</label>
           <input 
             type="text" 
-            className="w-full border rounded p-2 focus:ring-2 focus:ring-blue-500 outline-none"
+            className="w-full border rounded p-2 focus:ring-2 focus:ring-rose-500 outline-none"
             value={name}
             onChange={e => setName(e.target.value)}
           />
@@ -202,7 +172,7 @@ export default function HomeClient() {
           </label>
           <input 
             type="text" 
-            className="w-full border rounded p-2 focus:ring-2 focus:ring-blue-500 outline-none"
+            className="w-full border rounded p-2 focus:ring-2 focus:ring-rose-500 outline-none"
             value={username}
             onChange={e => setUsername(e.target.value)}
           />
@@ -211,15 +181,15 @@ export default function HomeClient() {
           <label className="block text-sm text-gray-600 mb-1">{t('auth.password')}</label>
           <input 
             type="password" 
-            className="w-full border rounded p-2 focus:ring-2 focus:ring-blue-500 outline-none"
+            className="w-full border rounded p-2 focus:ring-2 focus:ring-rose-500 outline-none"
             value={password}
             onChange={e => setPassword(e.target.value)}
           />
         </div>
         <button 
-          onClick={handleCustomerSubmit}
+          onClick={handleSubmit}
           disabled={loading}
-          className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:opacity-50 mt-2"
+          className="w-full bg-rose-500 text-white py-2 rounded hover:bg-rose-600 disabled:opacity-50 mt-2"
         >
           {loading ? '...' : t('auth.register')}
         </button>
@@ -235,8 +205,8 @@ export default function HomeClient() {
   );
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gray-50">
-      <h1 className="text-3xl font-bold mb-8 text-blue-900">{t('home.title')}</h1>
+    <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-rose-50">
+      <h1 className="text-4xl font-bold mb-8 text-rose-900 font-serif">{t('home.title')}</h1>
       
       {view === 'intro' && renderIntro()}
       {view === 'roleSelect' && renderRoleSelect()}

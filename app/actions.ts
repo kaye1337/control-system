@@ -6,28 +6,13 @@ import bcrypt from 'bcryptjs';
 
 // --- Auth / User Management ---
 
-// 1. Send Verification Code (Mock)
-export async function sendVerificationCode(phone: string) {
-  const code = Math.floor(100000 + Math.random() * 900000).toString();
-  const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 mins
-
-  await prisma.verificationCode.create({
-    data: { phone, code, expiresAt }
-  });
-
-  console.log(`[SMS MOCK] Code for ${phone}: ${code}`);
-  return { success: true, message: 'Code sent (check console)' };
-}
-
-// 2. Register Customer
-export async function registerCustomer(username: string, password: string, name: string) {
+// 1. Register Request
+export async function registerUser(username: string, password: string, name: string) {
   try {
-    // Validate username length
-    if (username.length < 3 || username.length > 10) {
-      return { success: false, message: 'Username must be between 3 and 10 characters' };
+    if (username.length < 3 || username.length > 20) {
+      return { success: false, message: 'Username must be between 3 and 20 characters' };
     }
 
-    // Check if exists
     const existing = await prisma.user.findUnique({ where: { username } });
     if (existing) {
       return { success: false, message: 'Username already taken' };
@@ -40,187 +25,149 @@ export async function registerCustomer(username: string, password: string, name:
         name,
         username,
         password: hashedPassword,
-        role: 'CUSTOMER'
+        role: 'MEMBER',
+        status: 'PENDING'
       }
     });
 
-    return { success: true, user };
+    return { success: true, message: 'Registration request sent. Please wait for admin approval.', user };
   } catch (error) {
     console.error('Registration Error:', error);
     return { success: false, message: 'System Error: ' + (error instanceof Error ? error.message : String(error)) };
   }
 }
 
-// 3. Login Customer
-export async function loginCustomer(username: string, password: string) {
-  const user = await prisma.user.findUnique({ where: { username } });
-  if (!user || !user.password) {
-    return { success: false, message: 'Invalid credentials' };
-  }
-
-  // Check if user is actually a customer
-  if (user.role !== 'CUSTOMER') {
-     return { success: false, message: 'Not a customer account' };
-  }
-
-  const match = await bcrypt.compare(password, user.password);
-  if (!match) {
-    return { success: false, message: 'Invalid credentials' };
-  }
-
-  return { success: true, user };
-}
-
-// 4. Login Staff (Boss/Waiter)
-export async function loginStaff(username: string, password: string) {
-  const user = await prisma.user.findUnique({ where: { username } });
-  if (!user || !user.password) {
-    return { success: false, message: 'Invalid credentials' };
-  }
-
-  const match = await bcrypt.compare(password, user.password);
-  if (!match) {
-    return { success: false, message: 'Invalid credentials' };
-  }
-
-  return { success: true, user };
-}
-
-// 5. Create Waiter (Boss Only)
-export async function createWaiter(bossId: string, username: string, password: string, name: string) {
-  // Verify boss
-  const boss = await prisma.user.findUnique({ where: { id: bossId } });
-  if (!boss || boss.role !== 'BOSS') {
-    return { success: false, message: 'Unauthorized' };
-  }
-
-  // Check username
-  const existing = await prisma.user.findUnique({ where: { username } });
-  if (existing) {
-    return { success: false, message: 'Username taken' };
-  }
-
-  const hashedPassword = await bcrypt.hash(password, 10);
-
-  const user = await prisma.user.create({
-    data: {
-      name,
-      username,
-      password: hashedPassword,
-      role: 'WAITER'
+// 2. Login
+export async function loginUser(username: string, password: string) {
+  try {
+    const user = await prisma.user.findUnique({ where: { username } });
+    if (!user) {
+      return { success: false, message: 'Invalid credentials' };
     }
-  });
 
-  await prisma.waiterProfile.create({
-    data: { userId: user.id, status: 'IDLE' }
-  });
+    const match = await bcrypt.compare(password, user.password);
+    if (!match) {
+      return { success: false, message: 'Invalid credentials' };
+    }
 
-  revalidatePath('/boss');
-  return { success: true, user };
+    if (user.status !== 'APPROVED') {
+      return { success: false, message: `Account is ${user.status}. Please contact admin.` };
+    }
+
+    return { success: true, user };
+  } catch (error) {
+    console.error('Login Error:', error);
+    return { success: false, message: 'Login failed' };
+  }
 }
 
-// --- Data Fetching ---
-
-export async function getUserByRole(role: string) {
+// 3. Admin: Get Pending Users
+export async function getPendingUsers() {
   try {
     const users = await prisma.user.findMany({
-      where: { role },
-      include: { waiterProfile: true }
+      where: { status: 'PENDING' },
+      orderBy: { createdAt: 'desc' }
     });
-    return users;
+    return { success: true, users };
   } catch (error) {
-    console.error('Error fetching users:', error);
-    return [];
+    console.error('Get Pending Users Error:', error);
+    return { success: false, users: [] };
   }
 }
 
+export async function approveUser(userId: string) {
+  return updateUserStatus(userId, 'APPROVED');
+}
+
+export async function rejectUser(userId: string) {
+  return updateUserStatus(userId, 'REJECTED');
+}
+
+// 4. Admin: Approve/Reject User
+export async function updateUserStatus(userId: string, status: 'APPROVED' | 'REJECTED') {
+  try {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { status }
+    });
+    revalidatePath('/admin');
+    return { success: true };
+  } catch (error) {
+    return { success: false, message: 'Failed to update status' };
+  }
+}
+
+// 5. Seed Admin
 export async function ensureSeed() {
   const count = await prisma.user.count();
   if (count === 0) {
-    const hashedPassword = await bcrypt.hash('boss123', 10);
+    const hashedPassword = await bcrypt.hash('admin123', 10);
     
-    // Create Default Boss
     await prisma.user.create({ 
       data: { 
-        name: 'Big Boss', 
-        role: 'BOSS',
-        username: 'boss',
+        name: 'Family Admin', 
+        role: 'ADMIN',
+        status: 'APPROVED',
+        username: 'admin',
         password: hashedPassword
       } 
     });
 
-    console.log('Seeded default boss: boss / boss123');
+    console.log('Seeded default admin: admin / admin123');
   }
 }
 
-// --- Waiter Actions ---
-export async function updateWaiterStatus(waiterProfileId: string, status: string) {
-  await prisma.waiterProfile.update({
-    where: { id: waiterProfileId },
-    data: { status }
-  });
-  revalidatePath('/');
-}
+// --- Diary Management ---
 
-export async function getWaiters() {
-  return await prisma.waiterProfile.findMany({
-    include: { user: true, schedules: true }
-  });
-}
-
-// --- Appointment Actions ---
-export async function createAppointment(customerId: string, waiterId: string | undefined, startTime: Date, endTime: Date, message: string) {
-  await prisma.appointment.create({
-    data: {
-      customerId,
-      waiterId,
-      startTime,
-      endTime,
-      message,
-      status: 'PENDING'
-    }
-  });
-  revalidatePath('/');
-}
-
-export async function updateAppointmentStatus(id: string, status: string) {
-  await prisma.appointment.update({
-    where: { id },
-    data: { status }
-  });
-  revalidatePath('/');
-}
-
-export async function getAppointments(role: string, userId: string) {
-  if (role === 'BOSS') {
-    return await prisma.appointment.findMany({
-      include: { customer: true, waiter: true },
-      orderBy: { createdAt: 'desc' }
+// 6. Create Entry
+export async function createDiaryEntry(authorId: string, content: string, mediaUrls: { url: string, type: 'IMAGE' | 'VIDEO' }[]) {
+  try {
+    const entry = await prisma.diaryEntry.create({
+      data: {
+        content,
+        authorId,
+        media: {
+          create: mediaUrls.map(m => ({ url: m.url, type: m.type }))
+        }
+      }
     });
-  } else if (role === 'CUSTOMER') {
-    return await prisma.appointment.findMany({
-      where: { customerId: userId },
-      include: { waiter: true },
-      orderBy: { createdAt: 'desc' }
-    });
+    revalidatePath('/diary');
+    return { success: true, entry };
+  } catch (error) {
+    console.error('Create Entry Error:', error);
+    return { success: false, message: 'Failed to create entry' };
   }
-  return [];
 }
 
-// --- Schedule Actions ---
-export async function createSchedule(waiterProfileId: string, startTime: Date, endTime: Date) {
-  await prisma.schedule.create({
-    data: {
-      waiterProfileId,
-      startTime,
-      endTime
-    }
-  });
-  revalidatePath('/');
+// 7. Get Entries
+export async function getDiaryEntries() {
+  try {
+    return await prisma.diaryEntry.findMany({
+      include: {
+        author: { select: { name: true } },
+        media: true,
+        comments: { include: { author: { select: { name: true } } } }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+  } catch (error) {
+    return [];
+  }
 }
 
-export async function getSchedules() {
-  return await prisma.schedule.findMany({
-    include: { waiterProfile: { include: { user: true } } }
-  });
+// 8. Add Comment
+export async function addComment(entryId: string, authorId: string, content: string) {
+  try {
+    await prisma.comment.create({
+      data: {
+        entryId,
+        authorId,
+        content
+      }
+    });
+    revalidatePath('/diary');
+    return { success: true };
+  } catch (error) {
+    return { success: false, message: 'Failed to add comment' };
+  }
 }

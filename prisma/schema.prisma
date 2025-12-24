@@ -3,75 +3,52 @@ generator client {
 }
 
 datasource db {
-     provider = "postgresql"
-     url = env("POSTGRES_PRISMA_URL") // 使用 Vercel 提供的连接池 URL
-     directUrl = env("POSTGRES_URL_NON_POOLING") // 用于迁移的直连 URL
-   }
+  provider = "postgresql"
+  url      = env("POSTGRES_PRISMA_URL")
+  directUrl = env("POSTGRES_URL_NON_POOLING")
+}
 
 model User {
   id        String   @id @default(uuid())
+  username  String   @unique
+  password  String
   name      String
-  role      String   // "BOSS", "CUSTOMER", "WAITER"
+  role      String   @default("MEMBER") // "ADMIN", "MEMBER"
+  status    String   @default("PENDING") // "PENDING", "APPROVED", "REJECTED"
   createdAt DateTime @default(now())
 
-  // Auth
-  phone     String?  @unique // For Customer
-  username  String?  @unique // For Boss/Waiter
-  password  String?  // For Boss/Waiter (hashed)
-
-  // Relationships
-  waiterProfile WaiterProfile?
-  
-  appointmentsAsCustomer Appointment[] @relation("CustomerAppointments")
-  appointmentsAsWaiter   Appointment[] @relation("WaiterAppointments")
+  entries   DiaryEntry[]
+  comments  Comment[]
 }
 
-model VerificationCode {
+model DiaryEntry {
   id        String   @id @default(uuid())
-  phone     String
-  code      String
-  expiresAt DateTime
+  content   String?  // Text content
   createdAt DateTime @default(now())
+  
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+
+  media     Media[]
+  comments  Comment[]
 }
 
-model WaiterProfile {
-  id     String @id @default(uuid())
-  userId String @unique
-  user   User   @relation(fields: [userId], references: [id])
-  status String @default("IDLE") // "IDLE", "BUSY"
-  
-  schedules Schedule[]
-  workLogs  WorkLog[]
+model Media {
+  id        String   @id @default(uuid())
+  url       String
+  type      String   // "IMAGE", "VIDEO"
+  entryId   String
+  entry     DiaryEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
 }
 
-model Appointment {
-  id         String   @id @default(uuid())
-  customerId String
-  waiterId   String?
+model Comment {
+  id        String   @id @default(uuid())
+  content   String
+  createdAt DateTime @default(now())
   
-  customer   User     @relation("CustomerAppointments", fields: [customerId], references: [id])
-  waiter     User?    @relation("WaiterAppointments", fields: [waiterId], references: [id])
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
   
-  startTime  DateTime
-  endTime    DateTime
-  status     String   @default("PENDING") // PENDING, APPROVED, REJECTED, CANCELLED
-  message    String?
-  
-  createdAt  DateTime @default(now())
-}
-
-model Schedule {
-  id              String        @id @default(uuid())
-  waiterProfileId String
-  waiterProfile   WaiterProfile @relation(fields: [waiterProfileId], references: [id])
-  startTime       DateTime
-  endTime         DateTime
-}
-
-model WorkLog {
-  id              String        @id @default(uuid())
-  waiterProfileId String
-  waiterProfile   WaiterProfile @relation(fields: [waiterProfileId], references: [id])
-  startTime       DateTime
-  endTime         DateTime?
+  entryId   String
+  entry     DiaryEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
 }
