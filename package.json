@@ -20,6 +20,7 @@
     "clsx": "^2.1.0",
     "date-fns": "^3.3.1",
     "fullcalendar": "^6.1.11",
+    "jose": "^6.1.3",
     "lucide-react": "^0.330.0",
     "next": "14.1.0",
     "react": "^18",

@@ -58,6 +58,10 @@ export async function loginUser(username: string, password: string) {
       return { success: false, message: `Account is ${user.status}. Please contact admin.` };
     }
 
+    // Create session
+    const session = await encrypt({ id: user.id, username: user.username, role: user.role });
+    cookies().set('session', session, { httpOnly: true, secure: true, sameSite: 'lax', path: '/' });
+
     // Do not return password field
     const { password: _, ...safeUser } = user;
     return { success: true, user: safeUser };
@@ -65,6 +69,11 @@ export async function loginUser(username: string, password: string) {
     console.error('Login Error (登录错误):', error);
     return { success: false, message: 'Login failed: ' + (error instanceof Error ? error.message : String(error)) };
   }
+}
+
+export async function logoutUser() {
+  cookies().delete('session');
+  return { success: true };
 }
 
 // 3. Admin: Get Pending Users

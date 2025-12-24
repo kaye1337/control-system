@@ -3,9 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/components/LanguageContext';
-import { getPendingUsers, approveUser, rejectUser } from '../actions';
+import { getPendingUsers, approveUser, rejectUser, logoutUser } from '../actions';
 
-export default function AdminDashboard() {
+export default function AdminDashboard({ user }: { user: any }) {
   const { t } = useLanguage();
   const router = useRouter();
   const [users, setUsers] = useState<any[]>([]);
@@ -36,7 +36,8 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await logoutUser();
     router.push('/');
   };
 

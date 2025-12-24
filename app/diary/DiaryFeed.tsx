@@ -1,21 +1,18 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/components/LanguageContext';
-import { getDiaryEntries, createDiaryEntry, addComment } from '../actions';
+import { getDiaryEntries, createDiaryEntry, addComment, logoutUser } from '../actions';
 
-export default function DiaryFeed() {
+interface DiaryFeedProps {
+  user: { id: string; username: string; role: string };
+}
+
+export default function DiaryFeed({ user }: DiaryFeedProps) {
   const { t } = useLanguage();
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const userId = searchParams.get('id'); // Assume passed from login
   
-  // Local state for user ID if not in URL (e.g. session management simplified)
-  // Ideally, use a proper session/auth context. 
-  // For this refactor, we rely on the URL param or local storage.
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-
   const [entries, setEntries] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
@@ -26,20 +23,8 @@ export default function DiaryFeed() {
   const [mediaType, setMediaType] = useState<'IMAGE' | 'VIDEO'>('IMAGE');
 
   useEffect(() => {
-    // Basic auth check simulation
-    if (userId) {
-      setCurrentUserId(userId);
-      localStorage.setItem('diary_user_id', userId);
-    } else {
-      const stored = localStorage.getItem('diary_user_id');
-      if (stored) {
-        setCurrentUserId(stored);
-      } else {
-        router.push('/');
-      }
-    }
     loadEntries();
-  }, [userId, router]);
+  }, []);
 
   const loadEntries = async () => {
     setLoading(true);
@@ -51,10 +36,10 @@ export default function DiaryFeed() {
   };
 
   const handleCreate = async () => {
-    if (!currentUserId || !newContent.trim()) return;
+    if (!newContent.trim()) return;
 
     const media = mediaUrl ? [{ url: mediaUrl, type: mediaType }] : [];
-    const res = await createDiaryEntry(currentUserId, newContent, media);
+    const res = await createDiaryEntry(user.id, newContent, media);
     
     if (res.success) {
       setNewContent('');
@@ -67,13 +52,13 @@ export default function DiaryFeed() {
   };
 
   const handleComment = async (entryId: string, content: string) => {
-    if (!currentUserId || !content.trim()) return;
-    await addComment(entryId, currentUserId, content);
+    if (!content.trim()) return;
+    await addComment(entryId, user.id, content);
     loadEntries();
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('diary_user_id');
+  const handleLogout = async () => {
+    await logoutUser();
     router.push('/');
   };
 
