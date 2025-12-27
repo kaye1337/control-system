@@ -17,6 +17,7 @@ export default function DiaryFeed({ user }: DiaryFeedProps) {
   const [entries, setEntries] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [createType, setCreateType] = useState<'text' | 'media'>('text');
 
 
   // New Entry State
@@ -111,7 +112,16 @@ export default function DiaryFeed({ user }: DiaryFeedProps) {
             <h1 className="text-xl font-bold text-rose-600 font-serif">日记列表</h1>
             <div className="flex gap-4">
                <button 
-                onClick={() => setShowCreate(true)}
+                onClick={() => { setCreateType('media'); setShowCreate(true); }}
+                className="bg-rose-500 hover:bg-rose-600 text-white font-semibold px-4 py-2 rounded-full shadow-md flex items-center gap-2 transition transform hover:scale-105"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+                </svg>
+                上传照片
+              </button>
+               <button 
+                onClick={() => { setCreateType('text'); setShowCreate(true); }}
                 className="text-rose-600 font-semibold hover:bg-rose-50 px-3 py-1 rounded"
               >
                 + 写日记
@@ -157,17 +167,18 @@ export default function DiaryFeed({ user }: DiaryFeedProps) {
         {showCreate && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-xl w-full max-w-lg p-6 shadow-2xl">
-              <h3 className="text-lg font-bold mb-4">写新日记</h3>
+              <h3 className="text-lg font-bold mb-4">{createType === 'media' ? '上传照片/视频' : '写新日记'}</h3>
               
               <textarea 
                 className="w-full border p-3 rounded-lg mb-4 h-32 resize-none focus:ring-2 focus:ring-rose-500 outline-none"
-                placeholder="分享你的故事..."
+                placeholder={createType === 'media' ? "给这张照片写点描述..." : "分享你的故事..."}
                 value={newContent}
                 onChange={e => setNewContent(e.target.value)}
               />
               
+              {(createType === 'media' || mediaUrl) && (
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">上传照片/视频</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">选择文件</label>
                 <div className="flex items-center gap-2">
                   <input
                     type="file"
@@ -183,6 +194,7 @@ export default function DiaryFeed({ user }: DiaryFeedProps) {
                   {uploading && <span className="text-sm text-gray-500">上传中...</span>}
                 </div>
               </div>
+              )}
 
               {mediaUrl && (
                 <div className="mb-4">

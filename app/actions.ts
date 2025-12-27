@@ -194,7 +194,9 @@ export async function deleteDiaryEntry(entryId: string, userId: string) {
     // Delete media from Vercel Blob
     for (const m of entry.media) {
       try {
-        await del(m.url);
+        if (m.url.startsWith('http')) { // Only try to delete if it looks like a remote URL
+            await del(m.url);
+        }
       } catch (err) {
         console.error('Failed to delete blob:', m.url, err);
       }
@@ -213,14 +215,18 @@ export async function deleteDiaryEntry(entryId: string, userId: string) {
 
 import { put, del } from '@vercel/blob';
 
-// ... existing imports ...
-
 // 9. Upload File to Vercel Blob
 export async function uploadFile(formData: FormData) {
   try {
     const file = formData.get('file') as File;
     if (!file) {
       return { success: false, message: '未提供文件' };
+    }
+
+    // Check if token is present
+    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+       console.error('Missing BLOB_READ_WRITE_TOKEN');
+       return { success: false, message: '服务器未配置存储 Token (BLOB_READ_WRITE_TOKEN)' };
     }
 
     const blob = await put(file.name, file, {
@@ -230,7 +236,7 @@ export async function uploadFile(formData: FormData) {
     return { success: true, url: blob.url, type: file.type.startsWith('video/') ? 'VIDEO' : 'IMAGE' };
   } catch (error) {
     console.error('Upload Error:', error);
-    return { success: false, message: '上传失败' };
+    return { success: false, message: '上传失败: ' + (error instanceof Error ? error.message : String(error)) };
   }
 }
 

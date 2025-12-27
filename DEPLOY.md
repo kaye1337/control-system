@@ -1,7 +1,7 @@
 # 项目部署指南 (Deployment Guide)
 
 这个项目是基于 Next.js + Prisma + SQLite 构建的。
-要将其部署到公网，推荐使用 **Vercel**（前端托管）配合 **Vercel Postgres**（云数据库）。
+要将其部署到公网，推荐使用 **Vercel**（前端托管）配合 **Vercel Postgres**（云数据库）和 **Vercel Blob**（文件存储）。
 
 ## 准备工作
 1. 注册 [GitHub](https://github.com/) 账号。
@@ -37,7 +37,19 @@
 4. 创建完成后，进入数据库详情页，点击 **.env.local** 标签，复制所有环境变量。
 5. 回到 Vercel 项目的 **Settings** -> **Environment Variables**，将这些变量添加进去（或者 Vercel 会自动帮你添加）。
 
-## 步骤 4：修改代码适配 Postgres
+## 步骤 4：配置对象存储 (Blob)
+**必须步骤：** 为了支持图片上传，你需要配置 Vercel Blob。
+
+1. 在 Vercel 项目页面，点击 **Storage** 选项卡。
+2. 点击 **Connect Store** -> **Create New** -> **Blob**。
+3. 创建完成后，你会获得一个 `BLOB_READ_WRITE_TOKEN`。
+4. 确保这个 Token 已经添加到项目的 **Settings** -> **Environment Variables** 中。
+5. **本地开发**：如果你想在本地测试上传功能，需要将 `BLOB_READ_WRITE_TOKEN` 添加到本地的 `.env` 文件中。
+   ```
+   BLOB_READ_WRITE_TOKEN=vercel_blob_rw_xxxxxxxxx
+   ```
+
+## 步骤 5：修改代码适配 Postgres
 为了让项目支持 Postgres，你需要修改 `prisma/schema.prisma`：
 
 1. 打开 `prisma/schema.prisma`。
@@ -58,7 +70,7 @@
 
 4. Vercel 会自动检测到新的提交并开始重新构建。
 
-## 步骤 5：初始化云数据库
+## 步骤 6：初始化云数据库
 构建完成后，你需要初始化云数据库的表结构。
 在 Vercel 部署日志中可能会因为数据库未初始化而报错，或者你可以手动执行：
 
