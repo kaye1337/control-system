@@ -3,7 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/components/LanguageContext';
-import { getDiaryEntries, createDiaryEntry, addComment, logoutUser } from '../actions';
+import { getDiaryEntries, createDiaryEntry, addComment, logoutUser, uploadFile } from '../actions';
+
+import GalleryGrid from './GalleryGrid';
 
 interface DiaryFeedProps {
   user: { id: string; username: string; role: string };
@@ -13,14 +15,36 @@ export default function DiaryFeed({ user }: DiaryFeedProps) {
   const { t } = useLanguage();
   const router = useRouter();
   
+  const [activeTab, setActiveTab] = useState<'feed' | 'gallery'>('feed');
   const [entries, setEntries] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+
 
   // New Entry State
   const [newContent, setNewContent] = useState('');
   const [mediaUrl, setMediaUrl] = useState('');
   const [mediaType, setMediaType] = useState<'IMAGE' | 'VIDEO'>('IMAGE');
+  const [uploading, setUploading] = useState(false);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    
+    setUploading(true);
+    const file = e.target.files[0];
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const res = await uploadFile(formData);
+    
+    if (res.success && res.url) {
+      setMediaUrl(res.url);
+      setMediaType(res.type as 'IMAGE' | 'VIDEO');
+    } else {
+      alert(t('diary.uploadFailed') || 'Upload failed');
+    }
+    setUploading(false);
+  };
 
   useEffect(() => {
     loadEntries();
@@ -66,20 +90,46 @@ export default function DiaryFeed({ user }: DiaryFeedProps) {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white shadow sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-xl font-bold text-rose-600 font-serif">{t('diary.title')}</h1>
-          <div className="flex gap-4">
-             <button 
-              onClick={() => setShowCreate(true)}
-              className="text-rose-600 font-semibold hover:bg-rose-50 px-3 py-1 rounded"
+        <div className="max-w-2xl mx-auto px-4 py-4 flex flex-col gap-4">
+          <div className="flex justify-between items-center">
+            <h1 className="text-xl font-bold text-rose-600 font-serif">{t('diary.title')}</h1>
+            <div className="flex gap-4">
+               <button 
+                onClick={() => setShowCreate(true)}
+                className="text-rose-600 font-semibold hover:bg-rose-50 px-3 py-1 rounded"
+              >
+                + {t('diary.newEntry')}
+              </button>
+              <button 
+                onClick={handleLogout}
+                className="text-gray-500 hover:text-gray-700 text-sm"
+              >
+                {t('common.logout')}
+              </button>
+            </div>
+          </div>
+          
+          {/* Tabs */}
+          <div className="flex gap-6 border-b border-gray-100">
+            <button
+              onClick={() => setActiveTab('feed')}
+              className={`pb-2 px-1 text-sm font-medium transition ${
+                activeTab === 'feed' 
+                  ? 'text-rose-600 border-b-2 border-rose-600' 
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
             >
-              + {t('diary.newEntry')}
+              {t('diary.title')}
             </button>
-            <button 
-              onClick={handleLogout}
-              className="text-gray-500 hover:text-gray-700 text-sm"
+            <button
+              onClick={() => setActiveTab('gallery')}
+              className={`pb-2 px-1 text-sm font-medium transition ${
+                activeTab === 'gallery' 
+                  ? 'text-rose-600 border-b-2 border-rose-600' 
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
             >
-              {t('common.logout')}
+              Gallery
             </button>
           </div>
         </div>
@@ -101,90 +151,103 @@ export default function DiaryFeed({ user }: DiaryFeedProps) {
               />
               
               <div className="mb-4">
-                <label className="block text-sm text-gray-600 mb-1">Media URL (Optional)</label>
-                <div className="flex gap-2">
-                  <input 
-                    type="text" 
-                    className="flex-1 border p-2 rounded"
-                    placeholder="http://..."
-                    value={mediaUrl}
-                    onChange={e => setMediaUrl(e.target.value)}
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('diary.uploadMedia')}</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="file"
+                    accept="image/*,video/*"
+                    onChange={handleFileUpload}
+                    className="block w-full text-sm text-gray-500
+                      file:mr-4 file:py-2 file:px-4
+                      file:rounded-full file:border-0
+                      file:text-sm file:font-semibold
+                      file:bg-rose-50 file:text-rose-700
+                      hover:file:bg-rose-100"
                   />
-                  <select 
-                    value={mediaType} 
-                    onChange={e => setMediaType(e.target.value as any)}
-                    className="border p-2 rounded"
-                  >
-                    <option value="IMAGE">Image</option>
-                    <option value="VIDEO">Video</option>
-                  </select>
+                  {uploading && <span className="text-sm text-gray-500">Uploading...</span>}
                 </div>
               </div>
 
+              {mediaUrl && (
+                <div className="mb-4">
+                  <p className="text-xs text-gray-500 mb-1">Preview:</p>
+                  {mediaType === 'IMAGE' ? (
+                    <img src={mediaUrl} alt="Preview" className="w-full h-40 object-cover rounded-lg" />
+                  ) : (
+                    <video src={mediaUrl} controls className="w-full h-40 object-cover rounded-lg" />
+                  )}
+                </div>
+              )}
+            
               <div className="flex justify-end gap-3">
                 <button 
                   onClick={() => setShowCreate(false)}
-                  className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded"
+                  className="px-4 py-2 text-gray-500 hover:bg-gray-100 rounded"
                 >
                   {t('common.cancel')}
                 </button>
                 <button 
                   onClick={handleCreate}
-                  className="px-6 py-2 bg-rose-500 text-white rounded hover:bg-rose-600"
+                  disabled={uploading}
+                  className="px-4 py-2 bg-rose-500 hover:bg-rose-600 text-white rounded shadow-sm disabled:opacity-50"
                 >
-                  {t('common.post')}
+                  {t('diary.post')}
                 </button>
               </div>
             </div>
           </div>
         )}
 
-        {/* Feed */}
-        <div className="flex flex-col gap-6">
-          {loading ? (
-            <div className="text-center py-10 text-gray-400">Loading memories...</div>
-          ) : entries.length === 0 ? (
-            <div className="text-center py-10 text-gray-400">{t('diary.noEntries')}</div>
-          ) : (
-            entries.map(entry => (
-              <article key={entry.id} className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
-                <div className="p-4 flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center text-rose-500 font-bold">
-                    {entry.author.name[0]}
+        {/* Feed or Gallery */}
+        {activeTab === 'gallery' ? (
+          <GalleryGrid />
+        ) : (
+          <div className="flex flex-col gap-6">
+            {loading ? (
+              <div className="text-center py-10 text-gray-400">Loading memories...</div>
+            ) : entries.length === 0 ? (
+              <div className="text-center py-10 text-gray-400">{t('diary.noEntries')}</div>
+            ) : (
+              entries.map(entry => (
+                <article key={entry.id} className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
+                  <div className="p-4 flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center text-rose-500 font-bold">
+                      {entry.author.name[0]}
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-gray-800">{entry.author.name}</h4>
+                      <p className="text-xs text-gray-400">{new Date(entry.createdAt).toLocaleString()}</p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-800">{entry.author.name}</h4>
-                    <p className="text-xs text-gray-400">{new Date(entry.createdAt).toLocaleString()}</p>
-                  </div>
-                </div>
-                
-                {entry.content && (
-                  <div className="px-4 pb-2 text-gray-700 whitespace-pre-wrap">
-                    {entry.content}
-                  </div>
-                )}
+                  
+                  {entry.content && (
+                    <div className="px-4 pb-2 text-gray-700 whitespace-pre-wrap">
+                      {entry.content}
+                    </div>
+                  )}
 
-                {entry.media && entry.media.map((m: any) => (
-                  <div key={m.id} className="w-full bg-black">
-                    {m.type === 'IMAGE' ? (
-                      <img src={m.url} alt="Post media" className="w-full max-h-96 object-contain" />
-                    ) : (
-                      <video src={m.url} controls className="w-full max-h-96" />
-                    )}
-                  </div>
-                ))}
+                  {entry.media && entry.media.map((m: any) => (
+                    <div key={m.id} className="w-full bg-black">
+                      {m.type === 'IMAGE' ? (
+                        <img src={m.url} alt="Post media" className="w-full max-h-96 object-contain" />
+                      ) : (
+                        <video src={m.url} controls className="w-full max-h-96" />
+                      )}
+                    </div>
+                  ))}
 
-                <div className="p-4 border-t border-gray-50">
-                  <CommentSection 
-                    comments={entry.comments} 
-                    onAddComment={(txt) => handleComment(entry.id, txt)}
-                    t={t}
-                  />
-                </div>
-              </article>
-            ))
-          )}
-        </div>
+                  <div className="p-4 border-t border-gray-50">
+                    <CommentSection 
+                      comments={entry.comments} 
+                      onAddComment={(txt) => handleComment(entry.id, txt)}
+                      t={t}
+                    />
+                  </div>
+                </article>
+              ))
+            )}
+          </div>
+        )}
       </main>
     </div>
   );

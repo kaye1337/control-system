@@ -172,6 +172,49 @@ export async function getDiaryEntries() {
   }
 }
 
+import { put } from '@vercel/blob';
+
+// ... existing imports ...
+
+// 9. Upload File to Vercel Blob
+export async function uploadFile(formData: FormData) {
+  try {
+    const file = formData.get('file') as File;
+    if (!file) {
+      return { success: false, message: 'No file provided' };
+    }
+
+    const blob = await put(file.name, file, {
+      access: 'public',
+    });
+
+    return { success: true, url: blob.url, type: file.type.startsWith('video/') ? 'VIDEO' : 'IMAGE' };
+  } catch (error) {
+    console.error('Upload Error:', error);
+    return { success: false, message: 'Upload failed' };
+  }
+}
+
+// 10. Get All Media
+export async function getAllMedia() {
+  try {
+    const media = await prisma.media.findMany({
+      include: {
+        entry: {
+          select: {
+            createdAt: true,
+            author: { select: { name: true } }
+          }
+        }
+      },
+      orderBy: { entry: { createdAt: 'desc' } }
+    });
+    return { success: true, media };
+  } catch (error) {
+    return { success: false, media: [] };
+  }
+}
+
 // 8. Add Comment
 export async function addComment(entryId: string, authorId: string, content: string) {
   try {

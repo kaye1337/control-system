@@ -15,6 +15,7 @@
     "@fullcalendar/react": "^6.1.11",
     "@fullcalendar/timegrid": "^6.1.11",
     "@prisma/client": "^5.10.2",
+    "@vercel/blob": "^2.0.0",
     "axios": "^1.6.7",
     "bcryptjs": "^3.0.3",
     "clsx": "^2.1.0",
