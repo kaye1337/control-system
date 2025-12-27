@@ -45,38 +45,39 @@ export default function GalleryGrid({ user }: GalleryGridProps) {
       ) : media.length === 0 ? (
         <div className="text-center py-10 text-gray-400">暂无照片或视频</div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="columns-2 md:columns-3 lg:columns-4 gap-4 space-y-4">
           {media.map((item) => (
             <div 
               key={item.id} 
-              className="relative aspect-square group cursor-pointer overflow-hidden rounded-xl shadow-sm hover:shadow-md transition"
+              className="break-inside-avoid relative group cursor-pointer overflow-hidden rounded-xl shadow-sm hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 bg-white"
               onClick={() => setSelectedMedia(item)}
             >
               {item.type === 'IMAGE' ? (
                 <img 
                   src={item.url} 
                   alt="Gallery item" 
-                  className="w-full h-full object-cover group-hover:scale-105 transition duration-300" 
+                  className="w-full h-auto object-cover group-hover:scale-105 transition duration-500" 
+                  loading="lazy"
                 />
               ) : (
                 <video 
                   src={item.url} 
-                  className="w-full h-full object-cover group-hover:scale-105 transition duration-300" 
+                  className="w-full h-auto object-cover group-hover:scale-105 transition duration-500" 
                 />
               )}
               
               {/* Overlay info */}
-              <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition flex flex-col justify-end p-3">
-                 <p className="text-white text-xs opacity-0 group-hover:opacity-100 font-medium drop-shadow-md">
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition duration-300 flex flex-col justify-end p-4">
+                 <p className="text-white text-sm font-bold drop-shadow-md translate-y-2 group-hover:translate-y-0 transition duration-300">
                    {item.entry?.author?.name}
                  </p>
-                 <p className="text-white text-[10px] opacity-0 group-hover:opacity-80 drop-shadow-md">
+                 <p className="text-white/80 text-xs mt-1 drop-shadow-md translate-y-2 group-hover:translate-y-0 transition duration-300 delay-75">
                    {new Date(item.entry?.createdAt).toLocaleDateString()}
                  </p>
               </div>
               
               {item.type === 'VIDEO' && (
-                <div className="absolute top-2 right-2 bg-black bg-opacity-50 text-white p-1 rounded-full">
+                <div className="absolute top-3 right-3 bg-black/50 backdrop-blur-sm text-white p-1.5 rounded-full">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
                     <path fillRule="evenodd" d="M4.5 5.653c0-1.426 1.529-2.33 2.779-1.643l11.54 6.348c1.295.712 1.295 2.573 0 3.285L7.28 19.991c-1.25.687-2.779-.217-2.779-1.643V5.653z" clipRule="evenodd" />
                   </svg>

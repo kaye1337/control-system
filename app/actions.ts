@@ -62,7 +62,14 @@ export async function loginUser(username: string, password: string) {
 
     // Create session
     const session = await encrypt({ id: user.id, username: user.username, role: user.role });
-    cookies().set('session', session, { httpOnly: true, secure: true, sameSite: 'lax', path: '/' });
+    const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+    cookies().set('session', session, { 
+      httpOnly: true, 
+      secure: true, 
+      sameSite: 'lax', 
+      path: '/',
+      expires: expires
+    });
 
     // Do not return password field
     const { password: _, ...safeUser } = user;
@@ -191,15 +198,9 @@ export async function deleteDiaryEntry(entryId: string, userId: string) {
       return { success: false, message: '权限不足' };
     }
 
-    // Delete media from Vercel Blob
+    // Delete media from Storage
     for (const m of entry.media) {
-      try {
-        if (m.url.startsWith('http')) { // Only try to delete if it looks like a remote URL
-            await del(m.url);
-        }
-      } catch (err) {
-        console.error('Failed to delete blob:', m.url, err);
-      }
+      await deleteFromStorage(m.url);
     }
 
     // Delete entry from DB (Cascades to Media and Comments)
@@ -213,7 +214,7 @@ export async function deleteDiaryEntry(entryId: string, userId: string) {
   }
 }
 
-import { put, del } from '@vercel/blob';
+import { uploadToStorage, deleteFromStorage } from '@/lib/storage';
 
 // 9. Upload File to Vercel Blob
 export async function uploadFile(formData: FormData) {
@@ -223,17 +224,10 @@ export async function uploadFile(formData: FormData) {
       return { success: false, message: '未提供文件' };
     }
 
-    // Check if token is present
-    if (!process.env.BLOB_READ_WRITE_TOKEN) {
-       console.error('Missing BLOB_READ_WRITE_TOKEN');
-       return { success: false, message: '服务器未配置存储 Token (BLOB_READ_WRITE_TOKEN)' };
-    }
+    const url = await uploadToStorage(file, file.name);
+    const type = file.type.startsWith('video/') ? 'VIDEO' : 'IMAGE';
 
-    const blob = await put(file.name, file, {
-      access: 'public',
-    });
-
-    return { success: true, url: blob.url, type: file.type.startsWith('video/') ? 'VIDEO' : 'IMAGE' };
+    return { success: true, url, type };
   } catch (error) {
     console.error('Upload Error:', error);
     return { success: false, message: '上传失败: ' + (error instanceof Error ? error.message : String(error)) };

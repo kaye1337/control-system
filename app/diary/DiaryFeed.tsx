@@ -13,7 +13,7 @@ interface DiaryFeedProps {
 export default function DiaryFeed({ user }: DiaryFeedProps) {
   const router = useRouter();
   
-  const [activeTab, setActiveTab] = useState<'feed' | 'gallery'>('feed');
+  const [activeTab, setActiveTab] = useState<'feed' | 'gallery'>('gallery');
   const [entries, setEntries] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
@@ -26,11 +26,64 @@ export default function DiaryFeed({ user }: DiaryFeedProps) {
   const [mediaType, setMediaType] = useState<'IMAGE' | 'VIDEO'>('IMAGE');
   const [uploading, setUploading] = useState(false);
 
+  // Helper function to compress image
+  const compressImage = async (file: File): Promise<File> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.src = URL.createObjectURL(file);
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 1200; // Limit width to 1200px
+        const scaleSize = MAX_WIDTH / img.width;
+        
+        // If image is smaller than max width, don't resize
+        if (scaleSize >= 1) {
+             resolve(file);
+             return;
+        }
+
+        canvas.width = MAX_WIDTH;
+        canvas.height = img.height * scaleSize;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+            resolve(file); // Fallback
+            return;
+        }
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+        canvas.toBlob((blob) => {
+          if (blob) {
+            // Create a new File object
+            const compressedFile = new File([blob], file.name, {
+              type: 'image/jpeg',
+              lastModified: Date.now(),
+            });
+            resolve(compressedFile);
+          } else {
+            resolve(file);
+          }
+        }, 'image/jpeg', 0.8); // 80% quality
+      };
+      img.onerror = (error) => reject(error);
+    });
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
     
     setUploading(true);
-    const file = e.target.files[0];
+    let file = e.target.files[0];
+    
+    // Compress if it is an image
+    if (file.type.startsWith('image/')) {
+        try {
+            file = await compressImage(file);
+        } catch (error) {
+            console.error('Compression failed, using original file', error);
+        }
+    }
+
     const formData = new FormData();
     formData.append('file', file);
 
