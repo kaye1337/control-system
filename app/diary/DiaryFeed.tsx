@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useLanguage } from '@/components/LanguageContext';
-import { getDiaryEntries, createDiaryEntry, addComment, logoutUser, uploadFile } from '../actions';
+import { getDiaryEntries, createDiaryEntry, addComment, logoutUser, uploadFile, deleteDiaryEntry } from '../actions';
 
 import GalleryGrid from './GalleryGrid';
 
@@ -12,7 +11,6 @@ interface DiaryFeedProps {
 }
 
 export default function DiaryFeed({ user }: DiaryFeedProps) {
-  const { t } = useLanguage();
   const router = useRouter();
   
   const [activeTab, setActiveTab] = useState<'feed' | 'gallery'>('feed');
@@ -41,9 +39,10 @@ export default function DiaryFeed({ user }: DiaryFeedProps) {
       setMediaUrl(res.url);
       setMediaType(res.type as 'IMAGE' | 'VIDEO');
     } else {
-      alert(t('diary.uploadFailed') || 'Upload failed');
+      alert(res.message || '上传失败');
     }
     setUploading(false);
+    e.target.value = '';
   };
 
   useEffect(() => {
@@ -60,10 +59,13 @@ export default function DiaryFeed({ user }: DiaryFeedProps) {
   };
 
   const handleCreate = async () => {
-    if (!newContent.trim()) return;
+    // Allow post if content is present OR media is present
+    if (!newContent.trim() && !mediaUrl) return;
 
+    setUploading(true);
     const media = mediaUrl ? [{ url: mediaUrl, type: mediaType }] : [];
     const res = await createDiaryEntry(user.id, newContent, media);
+    setUploading(false);
     
     if (res.success) {
       setNewContent('');
@@ -71,13 +73,27 @@ export default function DiaryFeed({ user }: DiaryFeedProps) {
       setShowCreate(false);
       loadEntries();
     } else {
-      alert(res.message || 'Failed to create entry');
+      alert(res.message || '发布日记失败');
+    }
+  };
+
+  const handleDelete = async (entryId: string) => {
+    if (!confirm('确定要删除这条日记吗？')) return;
+    
+    const res = await deleteDiaryEntry(entryId, user.id);
+    if (res.success) {
+      loadEntries();
+    } else {
+      alert(res.message || '删除失败');
     }
   };
 
   const handleComment = async (entryId: string, content: string) => {
     if (!content.trim()) return;
-    await addComment(entryId, user.id, content);
+    const res = await addComment(entryId, user.id, content);
+    if (!res.success) {
+      alert(res.message || '添加评论失败');
+    }
     loadEntries();
   };
 
@@ -92,19 +108,19 @@ export default function DiaryFeed({ user }: DiaryFeedProps) {
       <header className="bg-white shadow sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-4 flex flex-col gap-4">
           <div className="flex justify-between items-center">
-            <h1 className="text-xl font-bold text-rose-600 font-serif">{t('diary.title')}</h1>
+            <h1 className="text-xl font-bold text-rose-600 font-serif">日记列表</h1>
             <div className="flex gap-4">
                <button 
                 onClick={() => setShowCreate(true)}
                 className="text-rose-600 font-semibold hover:bg-rose-50 px-3 py-1 rounded"
               >
-                + {t('diary.newEntry')}
+                + 写日记
               </button>
               <button 
                 onClick={handleLogout}
                 className="text-gray-500 hover:text-gray-700 text-sm"
               >
-                {t('common.logout')}
+                退出登录
               </button>
             </div>
           </div>
@@ -119,7 +135,7 @@ export default function DiaryFeed({ user }: DiaryFeedProps) {
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              {t('diary.title')}
+              日记列表
             </button>
             <button
               onClick={() => setActiveTab('gallery')}
@@ -129,7 +145,7 @@ export default function DiaryFeed({ user }: DiaryFeedProps) {
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              Gallery
+              照片墙
             </button>
           </div>
         </div>
@@ -141,17 +157,17 @@ export default function DiaryFeed({ user }: DiaryFeedProps) {
         {showCreate && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-xl w-full max-w-lg p-6 shadow-2xl">
-              <h3 className="text-lg font-bold mb-4">{t('diary.createTitle')}</h3>
+              <h3 className="text-lg font-bold mb-4">写新日记</h3>
               
               <textarea 
                 className="w-full border p-3 rounded-lg mb-4 h-32 resize-none focus:ring-2 focus:ring-rose-500 outline-none"
-                placeholder={t('diary.placeholder')}
+                placeholder="分享你的故事..."
                 value={newContent}
                 onChange={e => setNewContent(e.target.value)}
               />
               
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t('diary.uploadMedia')}</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">上传照片/视频</label>
                 <div className="flex items-center gap-2">
                   <input
                     type="file"
@@ -164,13 +180,13 @@ export default function DiaryFeed({ user }: DiaryFeedProps) {
                       file:bg-rose-50 file:text-rose-700
                       hover:file:bg-rose-100"
                   />
-                  {uploading && <span className="text-sm text-gray-500">Uploading...</span>}
+                  {uploading && <span className="text-sm text-gray-500">上传中...</span>}
                 </div>
               </div>
 
               {mediaUrl && (
                 <div className="mb-4">
-                  <p className="text-xs text-gray-500 mb-1">Preview:</p>
+                  <p className="text-xs text-gray-500 mb-1">预览:</p>
                   {mediaType === 'IMAGE' ? (
                     <img src={mediaUrl} alt="Preview" className="w-full h-40 object-cover rounded-lg" />
                   ) : (
@@ -184,14 +200,14 @@ export default function DiaryFeed({ user }: DiaryFeedProps) {
                   onClick={() => setShowCreate(false)}
                   className="px-4 py-2 text-gray-500 hover:bg-gray-100 rounded"
                 >
-                  {t('common.cancel')}
+                  取消
                 </button>
                 <button 
                   onClick={handleCreate}
                   disabled={uploading}
                   className="px-4 py-2 bg-rose-500 hover:bg-rose-600 text-white rounded shadow-sm disabled:opacity-50"
                 >
-                  {t('diary.post')}
+                  发布
                 </button>
               </div>
             </div>
@@ -199,28 +215,42 @@ export default function DiaryFeed({ user }: DiaryFeedProps) {
         )}
 
         {/* Feed or Gallery */}
-        {activeTab === 'gallery' ? (
-          <GalleryGrid />
-        ) : (
+                {activeTab === 'gallery' ? (
+                  <GalleryGrid user={user} />
+                ) : (
           <div className="flex flex-col gap-6">
             {loading ? (
-              <div className="text-center py-10 text-gray-400">Loading memories...</div>
+              <div className="text-center py-10 text-gray-400">加载中...</div>
             ) : entries.length === 0 ? (
-              <div className="text-center py-10 text-gray-400">{t('diary.noEntries')}</div>
+              <div className="text-center py-10 text-gray-400">还没有日记，快来写第一篇吧！</div>
             ) : (
               entries.map(entry => (
                 <article key={entry.id} className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
-                  <div className="p-4 flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center text-rose-500 font-bold">
-                      {entry.author.name[0]}
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-gray-800">{entry.author.name}</h4>
-                      <p className="text-xs text-gray-400">{new Date(entry.createdAt).toLocaleString()}</p>
-                    </div>
-                  </div>
-                  
-                  {entry.content && (
+                          <div className="p-4 flex justify-between items-start">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center text-rose-500 font-bold">
+                                {entry.author.name[0]}
+                              </div>
+                              <div>
+                                <h4 className="font-semibold text-gray-800">{entry.author.name}</h4>
+                                <p className="text-xs text-gray-400">{new Date(entry.createdAt).toLocaleString()}</p>
+                              </div>
+                            </div>
+                            
+                            {(user.role === 'ADMIN' || user.id === entry.authorId) && (
+                              <button 
+                                onClick={() => handleDelete(entry.id)}
+                                className="text-gray-400 hover:text-red-500 transition"
+                                title="Delete"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                                </svg>
+                              </button>
+                            )}
+                          </div>
+                          
+                          {entry.content && (
                     <div className="px-4 pb-2 text-gray-700 whitespace-pre-wrap">
                       {entry.content}
                     </div>
@@ -240,7 +270,6 @@ export default function DiaryFeed({ user }: DiaryFeedProps) {
                     <CommentSection 
                       comments={entry.comments} 
                       onAddComment={(txt) => handleComment(entry.id, txt)}
-                      t={t}
                     />
                   </div>
                 </article>
@@ -253,7 +282,7 @@ export default function DiaryFeed({ user }: DiaryFeedProps) {
   );
 }
 
-function CommentSection({ comments, onAddComment, t }: { comments: any[], onAddComment: (t: string) => void, t: any }) {
+function CommentSection({ comments, onAddComment }: { comments: any[], onAddComment: (t: string) => void }) {
   const [txt, setTxt] = useState('');
 
   return (
@@ -270,7 +299,7 @@ function CommentSection({ comments, onAddComment, t }: { comments: any[], onAddC
         <input 
           type="text" 
           className="flex-1 bg-gray-100 rounded-full px-4 py-2 text-sm focus:ring-2 focus:ring-rose-200 outline-none"
-          placeholder={t('diary.commentPlaceholder')}
+          placeholder="写评论..."
           value={txt}
           onChange={e => setTxt(e.target.value)}
           onKeyDown={e => {

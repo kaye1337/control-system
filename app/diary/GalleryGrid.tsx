@@ -1,11 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getAllMedia } from '../actions';
-import { useLanguage } from '@/components/LanguageContext';
+import { getAllMedia, deleteDiaryEntry } from '../actions';
 
-export default function GalleryGrid() {
-  const { t } = useLanguage();
+interface GalleryGridProps {
+  user?: { id: string; role: string };
+}
+
+export default function GalleryGrid({ user }: GalleryGridProps) {
   const [media, setMedia] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedMedia, setSelectedMedia] = useState<any | null>(null);
@@ -23,12 +25,25 @@ export default function GalleryGrid() {
     setLoading(false);
   };
 
+  const handleDelete = async (entryId: string) => {
+    if (!user) return;
+    if (!window.confirm('确定要删除这张照片及其对应的日记吗？')) return;
+    
+    const res = await deleteDiaryEntry(entryId, user.id);
+    if (res.success) {
+      setSelectedMedia(null);
+      loadMedia();
+    } else {
+      window.alert(res.message || '删除失败');
+    }
+  };
+
   return (
     <div className="p-4">
       {loading ? (
-        <div className="text-center py-10 text-gray-400">Loading gallery...</div>
+        <div className="text-center py-10 text-gray-400">加载中...</div>
       ) : media.length === 0 ? (
-        <div className="text-center py-10 text-gray-400">No photos or videos yet</div>
+        <div className="text-center py-10 text-gray-400">暂无照片或视频</div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {media.map((item) => (
@@ -95,13 +110,25 @@ export default function GalleryGrid() {
             )}
             
             <div className="mt-4 text-center text-white">
-               <h3 className="text-lg font-bold">{selectedMedia.entry?.author?.name}</h3>
-               <p className="text-sm text-gray-300">
-                 {new Date(selectedMedia.entry?.createdAt).toLocaleString()}
-               </p>
-            </div>
+                       <h3 className="text-lg font-bold">{selectedMedia.entry?.author?.name}</h3>
+                       <p className="text-sm text-gray-300">
+                         {new Date(selectedMedia.entry?.createdAt).toLocaleString()}
+                       </p>
+                    </div>
 
-            <button 
+                    {user && (user.role === 'ADMIN' || user.id === selectedMedia.entry?.authorId) && (
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(selectedMedia.entry.id);
+                        }}
+                        className="mt-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition"
+                      >
+                        删除照片及日记
+                      </button>
+                    )}
+
+                    <button 
               className="absolute -top-10 right-0 text-white hover:text-gray-300"
               onClick={() => setSelectedMedia(null)}
             >

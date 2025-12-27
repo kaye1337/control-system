@@ -12,12 +12,12 @@ import { encrypt } from '@/lib/auth';
 export async function registerUser(username: string, password: string, name: string) {
   try {
     if (username.length < 3 || username.length > 20) {
-      return { success: false, message: 'Username must be between 3 and 20 characters' };
+      return { success: false, message: '用户名必须在3到20个字符之间' };
     }
 
     const existing = await prisma.user.findUnique({ where: { username } });
     if (existing) {
-      return { success: false, message: 'Username already taken' };
+      return { success: false, message: '用户名已被占用' };
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -32,10 +32,10 @@ export async function registerUser(username: string, password: string, name: str
       }
     });
 
-    return { success: true, message: 'Registration request sent. Please wait for admin approval.', user };
+    return { success: true, message: '注册申请已发送，请等待管理员批准。', user };
   } catch (error) {
     console.error('Registration Error (注册错误):', error);
-    return { success: false, message: 'System Error: ' + (error instanceof Error ? error.message : String(error)) };
+    return { success: false, message: '系统错误: ' + (error instanceof Error ? error.message : String(error)) };
   }
 }
 
@@ -46,18 +46,18 @@ export async function loginUser(username: string, password: string) {
     const user = await prisma.user.findUnique({ where: { username } });
     if (!user) {
       console.log('User not found (用户未找到)');
-      return { success: false, message: 'Invalid credentials' };
+      return { success: false, message: '用户名或密码错误' };
     }
 
     const match = await bcrypt.compare(password, user.password);
     if (!match) {
       console.log('Password mismatch (密码不匹配)');
-      return { success: false, message: 'Invalid credentials' };
+      return { success: false, message: '用户名或密码错误' };
     }
 
     if (user.status !== 'APPROVED') {
       console.log(`User status (用户状态): ${user.status}`);
-      return { success: false, message: `Account is ${user.status}. Please contact admin.` };
+      return { success: false, message: `账号状态: ${user.status}。请联系管理员。` };
     }
 
     // Create session
@@ -69,7 +69,7 @@ export async function loginUser(username: string, password: string) {
     return { success: true, user: safeUser };
   } catch (error) {
     console.error('Login Error (登录错误):', error);
-    return { success: false, message: 'Login failed: ' + (error instanceof Error ? error.message : String(error)) };
+    return { success: false, message: '登录失败: ' + (error instanceof Error ? error.message : String(error)) };
   }
 }
 
@@ -110,7 +110,7 @@ export async function updateUserStatus(userId: string, status: 'APPROVED' | 'REJ
     revalidatePath('/admin');
     return { success: true };
   } catch (error) {
-    return { success: false, message: 'Failed to update status' };
+    return { success: false, message: '更新状态失败' };
   }
 }
 
@@ -152,7 +152,7 @@ export async function createDiaryEntry(authorId: string, content: string, mediaU
     return { success: true, entry };
   } catch (error) {
     console.error('Create Entry Error:', error);
-    return { success: false, message: 'Failed to create entry' };
+    return { success: false, message: '发布日记失败' };
   }
 }
 
@@ -161,7 +161,7 @@ export async function getDiaryEntries() {
   try {
     return await prisma.diaryEntry.findMany({
       include: {
-        author: { select: { name: true } },
+        author: { select: { id: true, name: true } },
         media: true,
         comments: { include: { author: { select: { name: true } } } }
       },
@@ -172,7 +172,46 @@ export async function getDiaryEntries() {
   }
 }
 
-import { put } from '@vercel/blob';
+// 8. Delete Entry
+export async function deleteDiaryEntry(entryId: string, userId: string) {
+  try {
+    const entry = await prisma.diaryEntry.findUnique({
+      where: { id: entryId },
+      include: { media: true }
+    });
+
+    if (!entry) return { success: false, message: '日记不存在' };
+
+    // Check permissions: Admin or Author
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    const isAdmin = user?.role === 'ADMIN';
+    const isAuthor = entry.authorId === userId;
+
+    if (!isAdmin && !isAuthor) {
+      return { success: false, message: '权限不足' };
+    }
+
+    // Delete media from Vercel Blob
+    for (const m of entry.media) {
+      try {
+        await del(m.url);
+      } catch (err) {
+        console.error('Failed to delete blob:', m.url, err);
+      }
+    }
+
+    // Delete entry from DB (Cascades to Media and Comments)
+    await prisma.diaryEntry.delete({ where: { id: entryId } });
+    
+    revalidatePath('/diary');
+    return { success: true };
+  } catch (error) {
+    console.error('Delete Error:', error);
+    return { success: false, message: '删除日记失败' };
+  }
+}
+
+import { put, del } from '@vercel/blob';
 
 // ... existing imports ...
 
@@ -181,7 +220,7 @@ export async function uploadFile(formData: FormData) {
   try {
     const file = formData.get('file') as File;
     if (!file) {
-      return { success: false, message: 'No file provided' };
+      return { success: false, message: '未提供文件' };
     }
 
     const blob = await put(file.name, file, {
@@ -191,7 +230,7 @@ export async function uploadFile(formData: FormData) {
     return { success: true, url: blob.url, type: file.type.startsWith('video/') ? 'VIDEO' : 'IMAGE' };
   } catch (error) {
     console.error('Upload Error:', error);
-    return { success: false, message: 'Upload failed' };
+    return { success: false, message: '上传失败' };
   }
 }
 
@@ -228,6 +267,6 @@ export async function addComment(entryId: string, authorId: string, content: str
     revalidatePath('/diary');
     return { success: true };
   } catch (error) {
-    return { success: false, message: 'Failed to add comment' };
+    return { success: false, message: '添加评论失败' };
   }
 }
