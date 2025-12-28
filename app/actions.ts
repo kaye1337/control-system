@@ -8,7 +8,65 @@ import { encrypt } from '@/lib/auth';
 
 // --- Auth / User Management ---
 
-// 1. Register Request
+export async function getSystemConfig(key: string) {
+  try {
+    const config = await prisma.systemConfig.findUnique({
+      where: { key },
+    });
+    return config?.value || null;
+  } catch (error) {
+    console.error(`Error getting config ${key}:`, error);
+    return null;
+  }
+}
+
+export async function setSystemConfig(key: string, value: string) {
+  try {
+    await prisma.systemConfig.upsert({
+      where: { key },
+      update: { value },
+      create: { key, value },
+    });
+    return { success: true };
+  } catch (error) {
+    console.error(`Error setting config ${key}:`, error);
+    return { success: false };
+  }
+}
+
+export async function updateBackgroundImage(formData: FormData) {
+  try {
+    const file = formData.get('file') as File;
+    if (!file) return { success: false, message: '未选择文件' };
+
+    // 1. Upload new image
+    const newUrl = await uploadToStorage(file, `bg-${Date.now()}-${file.name}`);
+
+    // 2. Get old image URL
+    const oldUrl = await getSystemConfig('background_url');
+
+    // 3. Delete old image if exists
+    if (oldUrl) {
+      await deleteFromStorage(oldUrl);
+    }
+
+    // 4. Update DB
+    await setSystemConfig('background_url', newUrl);
+
+    return { success: true, url: newUrl };
+  } catch (error) {
+    console.error('Update background error:', error);
+    return { success: false, message: '更新背景失败' };
+  }
+}
+
+export async function getBackgroundImage() {
+  const url = await getSystemConfig('background_url');
+  // Default fallback if no custom background
+  return url || 'https://images.unsplash.com/photo-1472214103451-9374bd1c798e?q=80&w=2070&auto=format&fit=crop';
+}
+
+// 1. User Registration (Apply)
 export async function registerUser(username: string, password: string, name: string) {
   try {
     if (username.length < 3 || username.length > 20) {

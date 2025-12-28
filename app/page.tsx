@@ -1,4 +1,4 @@
-import { ensureSeed } from './actions';
+import { ensureSeed, getBackgroundImage } from './actions';
 import HomeClient from './HomeClient';
 
 export default async function Home() {
@@ -8,5 +8,7 @@ export default async function Home() {
     console.log("DB not ready yet, skipping seed");
   }
 
-  return <HomeClient />;
+  const bgUrl = await getBackgroundImage();
+
+  return <HomeClient initialBgUrl={bgUrl} />;
 }

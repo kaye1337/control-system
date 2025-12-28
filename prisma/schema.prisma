@@ -41,6 +41,11 @@ model Media {
   entry     DiaryEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
 }
 
+model SystemConfig {
+  key   String @id
+  value String
+}
+
 model Comment {
   id        String   @id @default(uuid())
   content   String

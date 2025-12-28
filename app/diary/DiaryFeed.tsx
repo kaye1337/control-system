@@ -8,9 +8,10 @@ import GalleryGrid from './GalleryGrid';
 
 interface DiaryFeedProps {
   user: { id: string; username: string; role: string };
+  bgUrl: string;
 }
 
-export default function DiaryFeed({ user }: DiaryFeedProps) {
+export default function DiaryFeed({ user, bgUrl }: DiaryFeedProps) {
   const router = useRouter();
   
   const [activeTab, setActiveTab] = useState<'feed' | 'gallery'>('gallery');
@@ -157,13 +158,20 @@ export default function DiaryFeed({ user }: DiaryFeedProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-4 py-4 flex flex-col gap-4">
-          <div className="flex justify-between items-center">
-            <h1 className="text-xl font-bold text-rose-600 font-serif">日记列表</h1>
-            <div className="flex gap-4">
+    <div className="min-h-screen bg-fixed bg-cover bg-center" style={{ backgroundImage: `url(${bgUrl})` }}>
+      {/* Background Overlay */}
+      <div className="fixed inset-0 bg-white/60 backdrop-blur-sm z-0" />
+
+      {/* Header - Desktop & Mobile */}
+      <header className="bg-white/80 backdrop-blur-md shadow-sm sticky top-0 z-10 border-b border-gray-100/50">
+        <div className="max-w-2xl mx-auto px-4 h-14 md:h-16 flex items-center justify-between">
+            {/* Title */}
+            <h1 className="text-lg md:text-xl font-bold text-rose-600 font-serif tracking-tight">
+               Family Album
+            </h1>
+
+            {/* Desktop Actions (Hidden on Mobile) */}
+            <div className="hidden md:flex gap-4 items-center">
                <button 
                 onClick={() => { setCreateType('media'); setShowCreate(true); }}
                 className="bg-rose-500 hover:bg-rose-600 text-white font-semibold px-4 py-2 rounded-full shadow-md flex items-center gap-2 transition transform hover:scale-105"
@@ -183,26 +191,52 @@ export default function DiaryFeed({ user }: DiaryFeedProps) {
                 onClick={handleLogout}
                 className="text-gray-500 hover:text-gray-700 text-sm"
               >
-                退出登录
+                退出
               </button>
             </div>
-          </div>
-          
-          {/* Tabs */}
-          <div className="flex gap-6 border-b border-gray-100">
+
+            {/* Mobile Actions (Visible on Mobile) */}
+            <div className="flex md:hidden items-center gap-3">
+                 {/* Mobile Logout (Small Icon) */}
+                 <button onClick={handleLogout} className="text-gray-400 p-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+                    </svg>
+                 </button>
+            </div>
+        </div>
+        
+        {/* Mobile Tab Bar (Inside Header for now, or just below) */}
+        <div className="flex md:hidden border-t border-gray-100">
+            <button
+              onClick={() => setActiveTab('gallery')}
+              className={`flex-1 py-3 text-sm font-medium text-center transition ${
+                activeTab === 'gallery' 
+                  ? 'text-rose-600 border-b-2 border-rose-600 bg-rose-50/50' 
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              照片墙
+            </button>
             <button
               onClick={() => setActiveTab('feed')}
-              className={`pb-2 px-1 text-sm font-medium transition ${
+              className={`flex-1 py-3 text-sm font-medium text-center transition ${
                 activeTab === 'feed' 
-                  ? 'text-rose-600 border-b-2 border-rose-600' 
+                  ? 'text-rose-600 border-b-2 border-rose-600 bg-rose-50/50' 
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >
               日记列表
             </button>
+        </div>
+      </header>
+
+      {/* Desktop Tabs (Hidden on Mobile) */}
+      <div className="hidden md:flex justify-center border-b border-gray-200/50 bg-white/50 backdrop-blur-sm relative z-10">
+          <div className="flex gap-8">
             <button
               onClick={() => setActiveTab('gallery')}
-              className={`pb-2 px-1 text-sm font-medium transition ${
+              className={`py-3 px-4 text-sm font-medium transition ${
                 activeTab === 'gallery' 
                   ? 'text-rose-600 border-b-2 border-rose-600' 
                   : 'text-gray-500 hover:text-gray-700'
@@ -210,12 +244,46 @@ export default function DiaryFeed({ user }: DiaryFeedProps) {
             >
               照片墙
             </button>
+            <button
+              onClick={() => setActiveTab('feed')}
+              className={`py-3 px-4 text-sm font-medium transition ${
+                activeTab === 'feed' 
+                  ? 'text-rose-600 border-b-2 border-rose-600' 
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              日记列表
+            </button>
           </div>
-        </div>
-      </header>
+      </div>
+
+      {/* Mobile FAB (Floating Action Button) */}
+      <div className="fixed right-6 bottom-8 md:hidden z-30 flex flex-col gap-4 items-end">
+         {/* Secondary FAB for Text (Only show when create is not showing, or make it a speed dial... simplified for now) */}
+         {/* Let's just put two buttons if space permits, or one main button that opens a modal */}
+         
+         <button 
+            onClick={() => { setCreateType('text'); setShowCreate(true); }}
+            className="w-12 h-12 bg-white text-rose-500 rounded-full shadow-lg flex items-center justify-center border border-rose-100 active:scale-90 transition"
+         >
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+            </svg>
+         </button>
+
+         <button 
+            onClick={() => { setCreateType('media'); setShowCreate(true); }}
+            className="w-14 h-14 bg-gradient-to-br from-rose-500 to-pink-600 text-white rounded-full shadow-xl flex items-center justify-center active:scale-90 transition"
+         >
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-8 h-8">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18.75 10.5h.008v.008h-.008V10.5z" />
+            </svg>
+         </button>
+      </div>
 
       {/* Main Content */}
-      <main className="max-w-2xl mx-auto p-4">
+      <main className="max-w-4xl mx-auto md:p-4 relative z-0">
         {/* Create Modal */}
         {showCreate && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -279,11 +347,10 @@ export default function DiaryFeed({ user }: DiaryFeedProps) {
           </div>
         )}
 
-        {/* Feed or Gallery */}
-                {activeTab === 'gallery' ? (
-                  <GalleryGrid user={user} />
-                ) : (
-          <div className="flex flex-col gap-6">
+        {activeTab === 'gallery' ? (
+          <GalleryGrid user={user} />
+        ) : (
+          <div className="max-w-2xl mx-auto space-y-6 p-4 pb-20">
             {loading ? (
               <div className="text-center py-10 text-gray-400">加载中...</div>
             ) : entries.length === 0 ? (

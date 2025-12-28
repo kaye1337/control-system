@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { loginUser, registerUser } from './actions';
 
-export default function HomeClient() {
+export default function HomeClient({ initialBgUrl }: { initialBgUrl: string }) {
   const router = useRouter();
   
   type ViewState = 'intro' | 'roleSelect' | 'loginForm' | 'registerForm';
@@ -203,16 +203,15 @@ export default function HomeClient() {
   );
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-rose-50">
-      <h1 className="text-4xl font-bold mb-8 text-rose-900 font-serif">家庭日记</h1>
+    <div className="min-h-screen flex items-center justify-center p-4 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: `url(${initialBgUrl})` }}>
+      {/* Overlay */}
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
       
-      {view === 'intro' && renderIntro()}
-      {view === 'roleSelect' && renderRoleSelect()}
-      {view === 'loginForm' && renderLoginForm()}
-      {view === 'registerForm' && renderRegisterForm()}
-      
-      <div className="mt-8 text-gray-400 text-xs">
-        <p>提示：新注册用户需要等待管理员批准。</p>
+      <div className="relative z-10 w-full flex justify-center">
+        {view === 'intro' && renderIntro()}
+        {view === 'roleSelect' && renderRoleSelect()}
+        {view === 'loginForm' && renderLoginForm()}
+        {view === 'registerForm' && renderRegisterForm()}
       </div>
     </div>
   );
