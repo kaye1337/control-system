@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { getDiaryEntries, createDiaryEntry, addComment, logoutUser, uploadFile, deleteDiaryEntry, uploadBatchPhotos, getAlbums } from '../actions';
 
 import AlbumTree from '../components/AlbumTree';
+import UploadModal from '../components/UploadModal';
+import Link from 'next/link';
 
 interface DiaryFeedProps {
   user: { id: string; username: string; role: string };
@@ -20,118 +22,6 @@ export default function DiaryFeed({ user, bgUrl }: DiaryFeedProps) {
   const [showCreate, setShowCreate] = useState(false);
   const [createType, setCreateType] = useState<'text' | 'media'>('text');
 
-
-  // New Entry State
-  const [newContent, setNewContent] = useState('');
-  const [mediaUrl, setMediaUrl] = useState('');
-  const [mediaType, setMediaType] = useState<'IMAGE' | 'VIDEO'>('IMAGE');
-  const [uploading, setUploading] = useState(false);
-
-  // Batch Upload State
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [albumName, setAlbumName] = useState('');
-  const [existingAlbums, setExistingAlbums] = useState<string[]>([]);
-
-  useEffect(() => {
-    // Fetch existing album names for suggestions
-    getAlbums().then(res => {
-      if (res.success && res.albums) {
-        setExistingAlbums(res.albums.map((a: any) => a.name));
-      }
-    });
-  }, []);
-
-  // Helper function to compress image
-  const compressImage = async (file: File): Promise<File> => {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.src = URL.createObjectURL(file);
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 1200; // Limit width to 1200px
-        const scaleSize = MAX_WIDTH / img.width;
-        
-        // If image is smaller than max width, don't resize
-        if (scaleSize >= 1) {
-             resolve(file);
-             return;
-        }
-
-        canvas.width = MAX_WIDTH;
-        canvas.height = img.height * scaleSize;
-
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-            resolve(file); // Fallback
-            return;
-        }
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-        canvas.toBlob((blob) => {
-          if (blob) {
-            // Create a new File object
-            const compressedFile = new File([blob], file.name, {
-              type: 'image/jpeg',
-              lastModified: Date.now(),
-            });
-            resolve(compressedFile);
-          } else {
-            resolve(file);
-          }
-        }, 'image/jpeg', 0.8); // 80% quality
-      };
-      img.onerror = (error) => reject(error);
-    });
-  };
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || e.target.files.length === 0) return;
-    
-    // If multiple files, handle as batch
-    if (e.target.files.length > 1 || createType === 'media') {
-        const files = Array.from(e.target.files);
-        // Compress images
-        const compressedFiles = await Promise.all(files.map(async (file) => {
-            if (file.type.startsWith('image/')) {
-                try {
-                    return await compressImage(file);
-                } catch (e) {
-                    return file;
-                }
-            }
-            return file;
-        }));
-        setSelectedFiles(compressedFiles);
-        return;
-    }
-
-    setUploading(true);
-    let file = e.target.files[0];
-    
-    // Compress if it is an image
-    if (file.type.startsWith('image/')) {
-        try {
-            file = await compressImage(file);
-        } catch (error) {
-            console.error('Compression failed, using original file', error);
-        }
-    }
-
-    const formData = new FormData();
-    formData.append('file', file);
-
-    const res = await uploadFile(formData);
-    
-    if (res.success && res.url) {
-      setMediaUrl(res.url);
-      setMediaType(res.type as 'IMAGE' | 'VIDEO');
-    } else {
-      alert(res.message || '上传失败');
-    }
-    setUploading(false);
-    e.target.value = '';
-  };
-
   useEffect(() => {
     loadEntries();
   }, []);
@@ -145,57 +35,14 @@ export default function DiaryFeed({ user, bgUrl }: DiaryFeedProps) {
     setLoading(false);
   };
 
-  const handleCreate = async () => {
-    // Handle Batch Upload
-    if (createType === 'media' && selectedFiles.length > 0) {
-        if (!albumName.trim()) {
-            alert('请输入相册名称');
-            return;
-        }
-        setUploading(true);
-        const formData = new FormData();
-        selectedFiles.forEach(file => formData.append('files', file));
-        formData.append('albumName', albumName);
-        
-        const res = await uploadBatchPhotos(formData);
-        setUploading(false);
-        
-        if (res.success) {
-            setSelectedFiles([]);
-            setAlbumName('');
-            setShowCreate(false);
-            // Refresh albums if we are in gallery view, but currently we just reload entries or do nothing?
-            // Ideally we should trigger a refresh of AlbumTree if possible, or just let it refresh on next mount.
-            alert('照片上传成功！');
-            // If we are on the tree tab, we might want to refresh it. 
-            // Since AlbumTree fetches on mount, maybe we can force a reload or just switch tabs.
-            if (activeTab === 'gallery') {
-                // simple hack to refresh component
-                setActiveTab('feed');
-                setTimeout(() => setActiveTab('gallery'), 100);
-            }
-        } else {
-            alert(res.message || '上传失败');
-        }
-        return;
+  const handleCreateSuccess = () => {
+    setShowCreate(false);
+    loadEntries();
+    if (activeTab === 'gallery') {
+       setActiveTab('feed');
+       setTimeout(() => setActiveTab('gallery'), 50);
     }
-
-    // Allow post if content is present OR media is present
-    if (!newContent.trim() && !mediaUrl) return;
-
-    setUploading(true);
-    const media = mediaUrl ? [{ url: mediaUrl, type: mediaType }] : [];
-    const res = await createDiaryEntry(user.id, newContent, media);
-    setUploading(false);
-    
-    if (res.success) {
-      setNewContent('');
-      setMediaUrl('');
-      setShowCreate(false);
-      loadEntries();
-    } else {
-      alert(res.message || '发布日记失败');
-    }
+    alert('发布成功！');
   };
 
   const handleDelete = async (entryId: string) => {
@@ -238,6 +85,12 @@ export default function DiaryFeed({ user, bgUrl }: DiaryFeedProps) {
 
             {/* Desktop Actions (Hidden on Mobile) */}
             <div className="hidden md:flex gap-4 items-center">
+               <Link 
+                 href="/albums"
+                 className="text-stone-600 font-semibold hover:text-rose-600 px-3 py-1 transition"
+               >
+                 相册库
+               </Link>
                <button 
                 onClick={() => { setCreateType('media'); setShowCreate(true); }}
                 className="bg-rose-500 hover:bg-rose-600 text-white font-semibold px-4 py-2 rounded-full shadow-md flex items-center gap-2 transition transform hover:scale-105"
@@ -350,117 +203,13 @@ export default function DiaryFeed({ user, bgUrl }: DiaryFeedProps) {
 
       {/* Main Content */}
       <main className="max-w-4xl mx-auto md:p-4 relative z-0">
-        {/* Create Modal */}
-        {showCreate && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl w-full max-w-lg p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
-              <h3 className="text-lg font-bold mb-4">{createType === 'media' ? '批量上传照片' : '写新日记'}</h3>
-              
-              {createType === 'media' ? (
-                 // Batch Upload Form
-                 <div className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">选择相册</label>
-                        <input 
-                            list="albums" 
-                            type="text"
-                            className="w-full border p-2 rounded focus:ring-2 focus:ring-rose-500 outline-none"
-                            placeholder="输入或选择相册名称..."
-                            value={albumName}
-                            onChange={(e) => setAlbumName(e.target.value)}
-                        />
-                        <datalist id="albums">
-                            {existingAlbums.map(name => <option key={name} value={name} />)}
-                        </datalist>
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">选择照片</label>
-                        <input
-                            type="file"
-                            accept="image/*,video/*"
-                            multiple
-                            onChange={handleFileUpload}
-                            className="block w-full text-sm text-gray-500
-                            file:mr-4 file:py-2 file:px-4
-                            file:rounded-full file:border-0
-                            file:text-sm file:font-semibold
-                            file:bg-rose-50 file:text-rose-700
-                            hover:file:bg-rose-100"
-                        />
-                    </div>
-
-                    {selectedFiles.length > 0 && (
-                        <div className="bg-gray-50 p-3 rounded text-sm text-gray-600">
-                            已选择 {selectedFiles.length} 张照片
-                            <div className="flex flex-wrap gap-2 mt-2">
-                                {selectedFiles.slice(0, 5).map((f, i) => (
-                                    <span key={i} className="bg-white border px-2 py-1 rounded text-xs truncate max-w-[100px]">{f.name}</span>
-                                ))}
-                                {selectedFiles.length > 5 && <span>...</span>}
-                            </div>
-                        </div>
-                    )}
-                 </div>
-              ) : (
-                 // Text Entry Form
-                 <>
-                  <textarea 
-                    className="w-full border p-3 rounded-lg mb-4 h-32 resize-none focus:ring-2 focus:ring-rose-500 outline-none"
-                    placeholder="分享你的故事..."
-                    value={newContent}
-                    onChange={e => setNewContent(e.target.value)}
-                  />
-                  
-                  {(mediaUrl || uploading) && (
-                    <div className="mb-4">
-                        {uploading ? (
-                             <div className="text-sm text-gray-500">上传中...</div>
-                        ) : (
-                            <div className="mb-4">
-                              <p className="text-xs text-gray-500 mb-1">预览:</p>
-                              {mediaType === 'IMAGE' ? (
-                                <img src={mediaUrl} alt="Preview" className="w-full h-40 object-cover rounded-lg" />
-                              ) : (
-                                <video src={mediaUrl} controls className="w-full h-40 object-cover rounded-lg" />
-                              )}
-                            </div>
-                        )}
-                    </div>
-                  )}
-
-                  {!mediaUrl && !uploading && (
-                    <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">添加图片/视频 (可选)</label>
-                        <input
-                            type="file"
-                            accept="image/*,video/*"
-                            onChange={handleFileUpload}
-                            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-rose-50 file:text-rose-700 hover:file:bg-rose-100"
-                        />
-                    </div>
-                  )}
-                 </>
-              )}
-            
-              <div className="flex justify-end gap-3 mt-6">
-                <button 
-                  onClick={() => setShowCreate(false)}
-                  className="px-4 py-2 text-gray-500 hover:bg-gray-100 rounded"
-                >
-                  取消
-                </button>
-                <button 
-                  onClick={handleCreate}
-                  disabled={uploading || (createType === 'media' && (selectedFiles.length === 0 || !albumName))}
-                  className="px-4 py-2 bg-rose-500 hover:bg-rose-600 text-white rounded shadow-sm disabled:opacity-50"
-                >
-                  {uploading ? '处理中...' : '发布'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        <UploadModal 
+            isOpen={showCreate}
+            onClose={() => setShowCreate(false)}
+            onSuccess={handleCreateSuccess}
+            user={user}
+            initialType={createType}
+        />
 
         {activeTab === 'gallery' ? (
           <AlbumTree />

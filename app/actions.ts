@@ -85,6 +85,32 @@ export async function getAlbums() {
   }
 }
 
+export async function getAlbum(albumId: string) {
+  try {
+    const user = await getSession();
+    if (!user) return { success: false, message: 'Not authenticated' };
+
+    const album = await prisma.album.findUnique({
+      where: { id: albumId },
+      include: {
+        media: {
+          orderBy: { id: 'desc' }
+        },
+        user: {
+          select: { name: true }
+        }
+      }
+    });
+
+    if (!album) return { success: false, message: 'Album not found' };
+
+    return { success: true, album };
+  } catch (error) {
+    console.error('Get album error:', error);
+    return { success: false, message: '获取相册失败' };
+  }
+}
+
 export async function uploadBatchPhotos(formData: FormData) {
   try {
     const user = await getSession();
@@ -280,6 +306,73 @@ export async function ensureSeed() {
     });
 
     console.log('Seeded default admin (已创建默认管理员): admin / admin123');
+  }
+}
+
+// 6. Admin: Get All Users
+export async function getAllUsers() {
+  try {
+    const session = await getSession();
+    if (!session || session.role !== 'ADMIN') return { success: false, message: '权限不足' };
+
+    const users = await prisma.user.findMany({
+      where: { role: 'MEMBER' }, // Only manage members
+      orderBy: { createdAt: 'desc' }
+    });
+    return { success: true, users };
+  } catch (error) {
+    console.error('Get All Users Error:', error);
+    return { success: false, users: [] };
+  }
+}
+
+// 7. Admin: Update User
+export async function updateUser(userId: string, data: { username?: string, password?: string }) {
+  try {
+    const session = await getSession();
+    if (!session || session.role !== 'ADMIN') return { success: false, message: '权限不足' };
+
+    const updateData: any = {};
+    if (data.username) updateData.username = data.username;
+    if (data.password) {
+      updateData.password = await bcrypt.hash(data.password, 10);
+    }
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: updateData
+    });
+
+    revalidatePath('/admin');
+    return { success: true };
+  } catch (error) {
+    console.error('Update User Error:', error);
+    return { success: false, message: '更新失败' };
+  }
+}
+
+// 8. Admin: Delete User
+export async function deleteUser(userId: string) {
+  try {
+    const session = await getSession();
+    if (!session || session.role !== 'ADMIN') return { success: false, message: '权限不足' };
+
+    // Delete user and cascade (Prisma handles cascade if configured, but let's be safe for storage)
+    // Manually delete media from storage first
+    const userMedia = await prisma.media.findMany({
+      where: { entry: { authorId: userId } }
+    });
+
+    for (const m of userMedia) {
+      await deleteFromStorage(m.url);
+    }
+
+    await prisma.user.delete({ where: { id: userId } });
+    revalidatePath('/admin');
+    return { success: true };
+  } catch (error) {
+    console.error('Delete User Error:', error);
+    return { success: false, message: '删除失败' };
   }
 }
 
