@@ -353,48 +353,97 @@ export default function DiaryFeed({ user, bgUrl }: DiaryFeedProps) {
         {/* Create Modal */}
         {showCreate && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl w-full max-w-lg p-6 shadow-2xl">
-              <h3 className="text-lg font-bold mb-4">{createType === 'media' ? '上传照片/视频' : '写新日记'}</h3>
+            <div className="bg-white rounded-xl w-full max-w-lg p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+              <h3 className="text-lg font-bold mb-4">{createType === 'media' ? '批量上传照片' : '写新日记'}</h3>
               
-              <textarea 
-                className="w-full border p-3 rounded-lg mb-4 h-32 resize-none focus:ring-2 focus:ring-rose-500 outline-none"
-                placeholder={createType === 'media' ? "给这张照片写点描述..." : "分享你的故事..."}
-                value={newContent}
-                onChange={e => setNewContent(e.target.value)}
-              />
-              
-              {(createType === 'media' || mediaUrl) && (
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">选择文件</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="file"
-                    accept="image/*,video/*"
-                    onChange={handleFileUpload}
-                    className="block w-full text-sm text-gray-500
-                      file:mr-4 file:py-2 file:px-4
-                      file:rounded-full file:border-0
-                      file:text-sm file:font-semibold
-                      file:bg-rose-50 file:text-rose-700
-                      hover:file:bg-rose-100"
-                  />
-                  {uploading && <span className="text-sm text-gray-500">上传中...</span>}
-                </div>
-              </div>
-              )}
+              {createType === 'media' ? (
+                 // Batch Upload Form
+                 <div className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">选择相册</label>
+                        <input 
+                            list="albums" 
+                            type="text"
+                            className="w-full border p-2 rounded focus:ring-2 focus:ring-rose-500 outline-none"
+                            placeholder="输入或选择相册名称..."
+                            value={albumName}
+                            onChange={(e) => setAlbumName(e.target.value)}
+                        />
+                        <datalist id="albums">
+                            {existingAlbums.map(name => <option key={name} value={name} />)}
+                        </datalist>
+                    </div>
 
-              {mediaUrl && (
-                <div className="mb-4">
-                  <p className="text-xs text-gray-500 mb-1">预览:</p>
-                  {mediaType === 'IMAGE' ? (
-                    <img src={mediaUrl} alt="Preview" className="w-full h-40 object-cover rounded-lg" />
-                  ) : (
-                    <video src={mediaUrl} controls className="w-full h-40 object-cover rounded-lg" />
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">选择照片</label>
+                        <input
+                            type="file"
+                            accept="image/*,video/*"
+                            multiple
+                            onChange={handleFileUpload}
+                            className="block w-full text-sm text-gray-500
+                            file:mr-4 file:py-2 file:px-4
+                            file:rounded-full file:border-0
+                            file:text-sm file:font-semibold
+                            file:bg-rose-50 file:text-rose-700
+                            hover:file:bg-rose-100"
+                        />
+                    </div>
+
+                    {selectedFiles.length > 0 && (
+                        <div className="bg-gray-50 p-3 rounded text-sm text-gray-600">
+                            已选择 {selectedFiles.length} 张照片
+                            <div className="flex flex-wrap gap-2 mt-2">
+                                {selectedFiles.slice(0, 5).map((f, i) => (
+                                    <span key={i} className="bg-white border px-2 py-1 rounded text-xs truncate max-w-[100px]">{f.name}</span>
+                                ))}
+                                {selectedFiles.length > 5 && <span>...</span>}
+                            </div>
+                        </div>
+                    )}
+                 </div>
+              ) : (
+                 // Text Entry Form
+                 <>
+                  <textarea 
+                    className="w-full border p-3 rounded-lg mb-4 h-32 resize-none focus:ring-2 focus:ring-rose-500 outline-none"
+                    placeholder="分享你的故事..."
+                    value={newContent}
+                    onChange={e => setNewContent(e.target.value)}
+                  />
+                  
+                  {(mediaUrl || uploading) && (
+                    <div className="mb-4">
+                        {uploading ? (
+                             <div className="text-sm text-gray-500">上传中...</div>
+                        ) : (
+                            <div className="mb-4">
+                              <p className="text-xs text-gray-500 mb-1">预览:</p>
+                              {mediaType === 'IMAGE' ? (
+                                <img src={mediaUrl} alt="Preview" className="w-full h-40 object-cover rounded-lg" />
+                              ) : (
+                                <video src={mediaUrl} controls className="w-full h-40 object-cover rounded-lg" />
+                              )}
+                            </div>
+                        )}
+                    </div>
                   )}
-                </div>
+
+                  {!mediaUrl && !uploading && (
+                    <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">添加图片/视频 (可选)</label>
+                        <input
+                            type="file"
+                            accept="image/*,video/*"
+                            onChange={handleFileUpload}
+                            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-rose-50 file:text-rose-700 hover:file:bg-rose-100"
+                        />
+                    </div>
+                  )}
+                 </>
               )}
             
-              <div className="flex justify-end gap-3">
+              <div className="flex justify-end gap-3 mt-6">
                 <button 
                   onClick={() => setShowCreate(false)}
                   className="px-4 py-2 text-gray-500 hover:bg-gray-100 rounded"
@@ -403,10 +452,10 @@ export default function DiaryFeed({ user, bgUrl }: DiaryFeedProps) {
                 </button>
                 <button 
                   onClick={handleCreate}
-                  disabled={uploading}
+                  disabled={uploading || (createType === 'media' && (selectedFiles.length === 0 || !albumName))}
                   className="px-4 py-2 bg-rose-500 hover:bg-rose-600 text-white rounded shadow-sm disabled:opacity-50"
                 >
-                  发布
+                  {uploading ? '处理中...' : '发布'}
                 </button>
               </div>
             </div>
