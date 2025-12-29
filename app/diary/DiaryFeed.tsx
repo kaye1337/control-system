@@ -27,6 +27,20 @@ export default function DiaryFeed({ user, bgUrl }: DiaryFeedProps) {
   const [mediaType, setMediaType] = useState<'IMAGE' | 'VIDEO'>('IMAGE');
   const [uploading, setUploading] = useState(false);
 
+  // Batch Upload State
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [albumName, setAlbumName] = useState('');
+  const [existingAlbums, setExistingAlbums] = useState<string[]>([]);
+
+  useEffect(() => {
+    // Fetch existing album names for suggestions
+    getAlbums().then(res => {
+      if (res.success && res.albums) {
+        setExistingAlbums(res.albums.map((a: any) => a.name));
+      }
+    });
+  }, []);
+
   // Helper function to compress image
   const compressImage = async (file: File): Promise<File> => {
     return new Promise((resolve, reject) => {
@@ -73,6 +87,24 @@ export default function DiaryFeed({ user, bgUrl }: DiaryFeedProps) {
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
     
+    // If multiple files, handle as batch
+    if (e.target.files.length > 1 || createType === 'media') {
+        const files = Array.from(e.target.files);
+        // Compress images
+        const compressedFiles = await Promise.all(files.map(async (file) => {
+            if (file.type.startsWith('image/')) {
+                try {
+                    return await compressImage(file);
+                } catch (e) {
+                    return file;
+                }
+            }
+            return file;
+        }));
+        setSelectedFiles(compressedFiles);
+        return;
+    }
+
     setUploading(true);
     let file = e.target.files[0];
     
@@ -382,7 +414,7 @@ export default function DiaryFeed({ user, bgUrl }: DiaryFeedProps) {
         )}
 
         {activeTab === 'gallery' ? (
-          <GalleryGrid user={user} />
+          <AlbumTree />
         ) : (
           <div className="max-w-2xl mx-auto space-y-6 p-4 pb-20">
             {loading ? (

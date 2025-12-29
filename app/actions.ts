@@ -4,7 +4,9 @@ import prisma from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import bcrypt from 'bcryptjs';
 import { cookies } from 'next/headers';
-import { encrypt } from '@/lib/auth';
+import { encrypt, getSession } from '@/lib/auth';
+import { uploadToStorage, deleteFromStorage } from '@/lib/storage';
+
 
 // --- Auth / User Management ---
 
@@ -353,8 +355,6 @@ export async function deleteDiaryEntry(entryId: string, userId: string) {
     return { success: false, message: '删除日记失败' };
   }
 }
-
-import { uploadToStorage, deleteFromStorage } from '@/lib/storage';
 
 // 9. Upload File to Vercel Blob
 export async function uploadFile(formData: FormData) {
