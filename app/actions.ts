@@ -359,22 +359,58 @@ export async function deleteUser(userId: string) {
     const session = await getSession();
     if (!session || session.role !== 'ADMIN') return { success: false, message: '权限不足' };
 
-    // Delete user and cascade (Prisma handles cascade if configured, but let's be safe for storage)
-    // Manually delete media from storage first
+    // 1. Find all media associated with the user (via entries OR albums)
     const userMedia = await prisma.media.findMany({
-      where: { entry: { authorId: userId } }
+      where: {
+        OR: [
+          { entry: { authorId: userId } },
+          { album: { userId: userId } }
+        ]
+      }
     });
 
+    // 2. Delete media from storage
     for (const m of userMedia) {
-      await deleteFromStorage(m.url);
+      if (m.url) {
+        await deleteFromStorage(m.url);
+      }
     }
 
+    // 3. Delete DB Records manually to avoid FK constraints if cascade is missing
+    // Delete Media
+    await prisma.media.deleteMany({
+      where: {
+        OR: [
+          { entry: { authorId: userId } },
+          { album: { userId: userId } }
+        ]
+      }
+    });
+
+    // Delete Comments authored by user
+    await prisma.comment.deleteMany({
+      where: { authorId: userId }
+    });
+
+    // Delete Entries (comments on these will be deleted if cascade exists, otherwise they might orphan or fail)
+    // Note: In schema, Comment->Entry has onDelete: Cascade. So deleting Entry deletes its comments.
+    await prisma.diaryEntry.deleteMany({
+      where: { authorId: userId }
+    });
+
+    // Delete Albums
+    await prisma.album.deleteMany({
+      where: { userId: userId }
+    });
+
+    // Finally Delete User
     await prisma.user.delete({ where: { id: userId } });
+    
     revalidatePath('/admin');
     return { success: true };
   } catch (error) {
     console.error('Delete User Error:', error);
-    return { success: false, message: '删除失败' };
+    return { success: false, message: '删除失败: ' + (error instanceof Error ? error.message : String(error)) };
   }
 }
 

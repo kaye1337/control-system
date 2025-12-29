@@ -91,20 +91,25 @@ export default function DiaryFeed({ user, bgUrl }: DiaryFeedProps) {
                >
                  相册库
                </Link>
+               {user.role === 'ADMIN' && (
+                 <Link 
+                   href="/admin"
+                   className="text-stone-600 font-semibold hover:text-rose-600 px-3 py-1 transition flex items-center gap-1"
+                 >
+                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                       <path strokeLinecap="round" strokeLinejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25" />
+                   </svg>
+                   管理控制台
+                 </Link>
+               )}
                <button 
-                onClick={() => { setCreateType('media'); setShowCreate(true); }}
+                onClick={() => setShowCreate(true)}
                 className="bg-rose-500 hover:bg-rose-600 text-white font-semibold px-4 py-2 rounded-full shadow-md flex items-center gap-2 transition transform hover:scale-105"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                 </svg>
-                上传照片
-              </button>
-               <button 
-                onClick={() => { setCreateType('text'); setShowCreate(true); }}
-                className="text-rose-600 font-semibold hover:bg-rose-50 px-3 py-1 rounded"
-              >
-                + 写日记
+                + 发布日记/照片
               </button>
               <button 
                 onClick={handleLogout}
@@ -182,21 +187,11 @@ export default function DiaryFeed({ user, bgUrl }: DiaryFeedProps) {
          {/* Let's just put two buttons if space permits, or one main button that opens a modal */}
          
          <button 
-            onClick={() => { setCreateType('text'); setShowCreate(true); }}
-            className="w-12 h-12 bg-white text-rose-500 rounded-full shadow-lg flex items-center justify-center border border-rose-100 active:scale-90 transition"
-         >
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
-            </svg>
-         </button>
-
-         <button 
-            onClick={() => { setCreateType('media'); setShowCreate(true); }}
+            onClick={() => setShowCreate(true)}
             className="w-14 h-14 bg-gradient-to-br from-rose-500 to-pink-600 text-white rounded-full shadow-xl flex items-center justify-center active:scale-90 transition"
          >
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-8 h-8">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18.75 10.5h.008v.008h-.008V10.5z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
             </svg>
          </button>
       </div>
