@@ -121,6 +121,8 @@ export async function uploadBatchPhotos(formData: FormData) {
     
     if (!files || files.length === 0) return { success: false, message: '未选择照片' };
     if (!albumName) return { success: false, message: '请输入相册名称' };
+    
+    const content = formData.get('content') as string;
 
     // 1. Find or Create Album
     let album = await prisma.album.findFirst({
@@ -143,7 +145,7 @@ export async function uploadBatchPhotos(formData: FormData) {
     // Create a diary entry to link these uploads (optional but good for timeline)
     const entry = await prisma.diaryEntry.create({
       data: {
-        content: `Uploaded ${files.length} photos to album "${albumName}"`,
+        content: content || `Uploaded ${files.length} photos to album "${albumName}"`,
         authorId: user.id,
         createdAt: new Date(),
       }
