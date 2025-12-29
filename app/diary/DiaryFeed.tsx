@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { getDiaryEntries, createDiaryEntry, addComment, logoutUser, uploadFile, deleteDiaryEntry } from '../actions';
+import { getDiaryEntries, createDiaryEntry, addComment, logoutUser, uploadFile, deleteDiaryEntry, uploadBatchPhotos, getAlbums } from '../actions';
 
-import GalleryGrid from './GalleryGrid';
+import AlbumTree from '../components/AlbumTree';
 
 interface DiaryFeedProps {
   user: { id: string; username: string; role: string };
@@ -114,6 +114,40 @@ export default function DiaryFeed({ user, bgUrl }: DiaryFeedProps) {
   };
 
   const handleCreate = async () => {
+    // Handle Batch Upload
+    if (createType === 'media' && selectedFiles.length > 0) {
+        if (!albumName.trim()) {
+            alert('请输入相册名称');
+            return;
+        }
+        setUploading(true);
+        const formData = new FormData();
+        selectedFiles.forEach(file => formData.append('files', file));
+        formData.append('albumName', albumName);
+        
+        const res = await uploadBatchPhotos(formData);
+        setUploading(false);
+        
+        if (res.success) {
+            setSelectedFiles([]);
+            setAlbumName('');
+            setShowCreate(false);
+            // Refresh albums if we are in gallery view, but currently we just reload entries or do nothing?
+            // Ideally we should trigger a refresh of AlbumTree if possible, or just let it refresh on next mount.
+            alert('照片上传成功！');
+            // If we are on the tree tab, we might want to refresh it. 
+            // Since AlbumTree fetches on mount, maybe we can force a reload or just switch tabs.
+            if (activeTab === 'gallery') {
+                // simple hack to refresh component
+                setActiveTab('feed');
+                setTimeout(() => setActiveTab('gallery'), 100);
+            }
+        } else {
+            alert(res.message || '上传失败');
+        }
+        return;
+    }
+
     // Allow post if content is present OR media is present
     if (!newContent.trim() && !mediaUrl) return;
 
@@ -219,14 +253,14 @@ export default function DiaryFeed({ user, bgUrl }: DiaryFeedProps) {
               照片墙
             </button>
             <button
-              onClick={() => setActiveTab('feed')}
+              onClick={() => setActiveTab('gallery')}
               className={`flex-1 py-3 text-sm font-medium text-center transition ${
-                activeTab === 'feed' 
+                activeTab === 'gallery' 
                   ? 'text-rose-600 border-b-2 border-rose-600 bg-rose-50/50' 
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              日记列表
+              相册树
             </button>
         </div>
       </header>
@@ -242,7 +276,7 @@ export default function DiaryFeed({ user, bgUrl }: DiaryFeedProps) {
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              照片墙
+              相册树
             </button>
             <button
               onClick={() => setActiveTab('feed')}

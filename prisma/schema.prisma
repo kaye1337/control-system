@@ -19,6 +19,7 @@ model User {
 
   entries   DiaryEntry[]
   comments  Comment[]
+  albums    Album[]
 }
 
 model DiaryEntry {
@@ -37,8 +38,24 @@ model Media {
   id        String   @id @default(uuid())
   url       String
   type      String   // "IMAGE", "VIDEO"
-  entryId   String
-  entry     DiaryEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  entryId   String?
+  entry     DiaryEntry? @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  
+  albumId   String?
+  album     Album?   @relation(fields: [albumId], references: [id])
+}
+
+model Album {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  
+  media     Media[]
+
+  @@unique([userId, name])
 }
 
 model SystemConfig {

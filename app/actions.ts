@@ -60,6 +60,88 @@ export async function updateBackgroundImage(formData: FormData) {
   }
 }
 
+export async function getAlbums() {
+  try {
+    const user = await getSession();
+    if (!user) return { success: false, message: 'Not authenticated' };
+
+    const albums = await prisma.album.findMany({
+      where: { userId: user.id },
+      include: {
+        media: {
+          take: 3, // Get first 3 images as "leaves"
+          orderBy: { id: 'desc' }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    return { success: true, albums };
+  } catch (error) {
+    console.error('Get albums error:', error);
+    return { success: false, albums: [] };
+  }
+}
+
+export async function uploadBatchPhotos(formData: FormData) {
+  try {
+    const user = await getSession();
+    if (!user) return { success: false, message: 'Not authenticated' };
+
+    const files = formData.getAll('files') as File[];
+    const albumName = formData.get('albumName') as string;
+    
+    if (!files || files.length === 0) return { success: false, message: '未选择照片' };
+    if (!albumName) return { success: false, message: '请输入相册名称' };
+
+    // 1. Find or Create Album
+    let album = await prisma.album.findFirst({
+      where: { 
+        userId: user.id,
+        name: albumName 
+      }
+    });
+
+    if (!album) {
+      album = await prisma.album.create({
+        data: {
+          name: albumName,
+          userId: user.id
+        }
+      });
+    }
+
+    // 2. Upload Files and Create Media Records
+    // Create a diary entry to link these uploads (optional but good for timeline)
+    const entry = await prisma.diaryEntry.create({
+      data: {
+        content: `Uploaded ${files.length} photos to album "${albumName}"`,
+        authorId: user.id,
+        createdAt: new Date(),
+      }
+    });
+
+    const uploadPromises = files.map(async (file) => {
+      const url = await uploadToStorage(file, `album-${album!.id}-${Date.now()}-${file.name}`);
+      return prisma.media.create({
+        data: {
+          url,
+          type: file.type.startsWith('video') ? 'VIDEO' : 'IMAGE',
+          entryId: entry.id,
+          albumId: album!.id
+        }
+      });
+    });
+
+    await Promise.all(uploadPromises);
+
+    return { success: true };
+  } catch (error) {
+    console.error('Batch upload error:', error);
+    return { success: false, message: '上传失败' };
+  }
+}
+
 export async function getBackgroundImage() {
   const url = await getSystemConfig('background_url');
   // Default fallback if no custom background
