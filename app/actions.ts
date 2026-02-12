@@ -67,8 +67,8 @@ export async function getAlbums() {
     const user = await getSession();
     if (!user) return { success: false, message: 'Not authenticated' };
 
+    // Return ALL albums (Shared Folder Structure)
     const albums = await prisma.album.findMany({
-      where: { userId: user.id },
       include: {
         media: {
           take: 3, // Get first 3 images as "leaves"
@@ -85,6 +85,94 @@ export async function getAlbums() {
   }
 }
 
+// Admin: Create Album
+export async function createAlbum(name: string) {
+  try {
+    const session = await getSession();
+    if (!session || session.role !== 'ADMIN') return { success: false, message: '权限不足' };
+
+    const existing = await prisma.album.findFirst({ where: { name } });
+    if (existing) return { success: false, message: '相册已存在' };
+
+    const album = await prisma.album.create({
+      data: {
+        name,
+        userId: session.id // Created by Admin
+      }
+    });
+    revalidatePath('/diary');
+    revalidatePath('/albums');
+    return { success: true, album };
+  } catch (error) {
+    return { success: false, message: '创建失败' };
+  }
+}
+
+// Admin: Delete Album
+export async function deleteAlbum(albumId: string) {
+  try {
+    const session = await getSession();
+    if (!session || session.role !== 'ADMIN') return { success: false, message: '权限不足' };
+
+    // Delete media in album (or unlink? Usually delete if folder is deleted)
+    // But media might be linked to DiaryEntry.
+    // Schema: Media -> Album (Optional).
+    // If we delete Album, Media.albumId becomes null? Or we delete Media?
+    // User says "Users can delete their own photos".
+    // If Admin deletes a folder, what happens to photos?
+    // Usually, delete the folder = delete contents.
+    // Let's implement cascade delete for simplicity, or just unlink.
+    // Prisma schema might not have cascade on Album->Media.
+    // Let's check schema. Album->Media is One-to-Many.
+    // If I delete Album, I should probably delete the media too or move them to "Uncategorized".
+    // For now, let's just delete the Album record. If foreign key constraint fails, we'll know.
+    // Actually, let's manually delete media to be safe and clean storage.
+    
+    const album = await prisma.album.findUnique({
+        where: { id: albumId },
+        include: { media: true }
+    });
+    
+    if (!album) return { success: false, message: '相册不存在' };
+
+    // Delete media files
+    for (const m of album.media) {
+        if (m.url) await deleteFromStorage(m.url);
+    }
+    
+    // Delete media records
+    await prisma.media.deleteMany({ where: { albumId } });
+    
+    // Delete Album
+    await prisma.album.delete({ where: { id: albumId } });
+
+    revalidatePath('/diary');
+    revalidatePath('/albums');
+    return { success: true };
+  } catch (error) {
+    console.error(error);
+    return { success: false, message: '删除失败' };
+  }
+}
+
+// Admin: Update Album Name
+export async function updateAlbum(albumId: string, name: string) {
+  try {
+    const session = await getSession();
+    if (!session || session.role !== 'ADMIN') return { success: false, message: '权限不足' };
+
+    await prisma.album.update({
+      where: { id: albumId },
+      data: { name }
+    });
+    revalidatePath('/diary');
+    revalidatePath('/albums');
+    return { success: true };
+  } catch (error) {
+    return { success: false, message: '更新失败' };
+  }
+}
+
 export async function getAlbum(albumId: string) {
   try {
     const user = await getSession();
@@ -94,7 +182,12 @@ export async function getAlbum(albumId: string) {
       where: { id: albumId },
       include: {
         media: {
-          orderBy: { id: 'desc' }
+          orderBy: { id: 'desc' },
+          include: {
+            entry: {
+              select: { authorId: true }
+            }
+          }
         },
         user: {
           select: { name: true }
@@ -117,35 +210,27 @@ export async function uploadBatchPhotos(formData: FormData) {
     if (!user) return { success: false, message: 'Not authenticated' };
 
     const files = formData.getAll('files') as File[];
-    const albumName = formData.get('albumName') as string;
+    const albumId = formData.get('albumId') as string;
     
     if (!files || files.length === 0) return { success: false, message: '未选择照片' };
-    if (!albumName) return { success: false, message: '请输入相册名称' };
+    if (!albumId) return { success: false, message: '请选择相册' };
     
     const content = formData.get('content') as string;
 
-    // 1. Find or Create Album
-    let album = await prisma.album.findFirst({
-      where: { 
-        userId: user.id,
-        name: albumName 
-      }
+    // 1. Verify Album Exists
+    const album = await prisma.album.findUnique({
+      where: { id: albumId }
     });
 
     if (!album) {
-      album = await prisma.album.create({
-        data: {
-          name: albumName,
-          userId: user.id
-        }
-      });
+        return { success: false, message: '相册不存在' };
     }
 
     // 2. Upload Files and Create Media Records
     // Create a diary entry to link these uploads (optional but good for timeline)
     const entry = await prisma.diaryEntry.create({
       data: {
-        content: content || `Uploaded ${files.length} photos to album "${albumName}"`,
+        content: content || `Uploaded ${files.length} photos to album "${album.name}"`,
         authorId: user.id,
         createdAt: new Date(),
       }
@@ -165,6 +250,8 @@ export async function uploadBatchPhotos(formData: FormData) {
 
     await Promise.all(uploadPromises);
 
+    revalidatePath('/diary');
+    revalidatePath('/albums');
     return { success: true };
   } catch (error) {
     console.error('Batch upload error:', error);
@@ -525,6 +612,42 @@ export async function getAllMedia() {
   }
 }
 
+// 11. Delete Single Media
+export async function deleteMedia(mediaId: string) {
+  try {
+    const session = await getSession();
+    if (!session) return { success: false, message: '未登录' };
+
+    const media = await prisma.media.findUnique({
+      where: { id: mediaId },
+      include: { entry: true }
+    });
+
+    if (!media) return { success: false, message: '照片不存在' };
+
+    const isAuthor = media.entry?.authorId === session.id;
+    const isAdmin = session.role === 'ADMIN';
+
+    if (!isAuthor && !isAdmin) {
+      return { success: false, message: '无权删除' };
+    }
+
+    if (media.url) {
+      await deleteFromStorage(media.url);
+    }
+
+    await prisma.media.delete({ where: { id: mediaId } });
+    
+    // If entry has no more media and no content, maybe delete entry? 
+    // For now, let's keep it simple.
+    
+    revalidatePath('/diary');
+    return { success: true };
+  } catch (error) {
+    console.error('Delete Media Error:', error);
+    return { success: false, message: '删除失败' };
+  }
+}
 // 8. Add Comment
 export async function addComment(entryId: string, authorId: string, content: string) {
   try {

@@ -9,13 +9,14 @@ interface UploadModalProps {
   onSuccess: () => void;
   user: { id: string; username: string; role: string };
   initialType?: 'text' | 'media'; // Kept for compatibility but unused logic-wise
+  defaultAlbumId?: string | null;
 }
 
-export default function UploadModal({ isOpen, onClose, onSuccess, user }: UploadModalProps) {
+export default function UploadModal({ isOpen, onClose, onSuccess, user, defaultAlbumId }: UploadModalProps) {
   const [content, setContent] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [albumName, setAlbumName] = useState('');
-  const [existingAlbums, setExistingAlbums] = useState<string[]>([]);
+  const [albumId, setAlbumId] = useState('');
+  const [existingAlbums, setExistingAlbums] = useState<{ id: string; name: string }[]>([]);
   const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
@@ -23,12 +24,12 @@ export default function UploadModal({ isOpen, onClose, onSuccess, user }: Upload
       // Reset state
       setContent('');
       setSelectedFiles([]);
-      setAlbumName('');
+      setAlbumId(defaultAlbumId || '');
       
-      // Fetch existing album names
+      // Fetch existing albums
       getAlbums().then(res => {
         if (res.success && res.albums) {
-          setExistingAlbums(res.albums.map((a: any) => a.name));
+          setExistingAlbums(res.albums.map((a: any) => ({ id: a.id, name: a.name })));
         }
       });
     }
@@ -101,8 +102,8 @@ export default function UploadModal({ isOpen, onClose, onSuccess, user }: Upload
     if (!content.trim() && selectedFiles.length === 0) return;
 
     // Validation: If files are selected, Album is mandatory
-    if (selectedFiles.length > 0 && !albumName.trim()) {
-        alert('上传照片时必须选择或输入一个相册名称');
+    if (selectedFiles.length > 0 && !albumId) {
+        alert('上传照片时必须选择一个相册');
         return;
     }
 
@@ -113,7 +114,7 @@ export default function UploadModal({ isOpen, onClose, onSuccess, user }: Upload
         // Case 1: Upload Photos (with optional text) -> Use uploadBatchPhotos
         const formData = new FormData();
         selectedFiles.forEach(file => formData.append('files', file));
-        formData.append('albumName', albumName);
+        formData.append('albumId', albumId);
         if (content.trim()) {
             formData.append('content', content);
         }
@@ -202,18 +203,22 @@ export default function UploadModal({ isOpen, onClose, onSuccess, user }: Upload
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                         归档相册 <span className="text-red-500">*</span>
                     </label>
-                    <input 
-                        list="albums" 
-                        type="text"
-                        className="w-full border p-2 rounded focus:ring-2 focus:ring-rose-500 outline-none"
-                        placeholder="选择或输入相册名称..."
-                        value={albumName}
-                        onChange={(e) => setAlbumName(e.target.value)}
-                    />
-                    <datalist id="albums">
-                        {existingAlbums.map(name => <option key={name} value={name} />)}
-                    </datalist>
-                    <p className="text-xs text-gray-400 mt-1">照片将归档到此相册文件夹中</p>
+                    <select
+                        className={`w-full border p-2 rounded focus:ring-2 focus:ring-rose-500 outline-none bg-white ${defaultAlbumId ? 'bg-gray-100' : ''}`}
+                        value={albumId}
+                        onChange={(e) => setAlbumId(e.target.value)}
+                        disabled={!!defaultAlbumId}
+                    >
+                        <option value="">-- 请选择相册 --</option>
+                        {existingAlbums.map(album => (
+                            <option key={album.id} value={album.id}>
+                                {album.name}
+                            </option>
+                        ))}
+                    </select>
+                    <p className="text-xs text-gray-400 mt-1">
+                        {defaultAlbumId ? '已锁定当前选中相册' : '照片将归档到此相册文件夹中'}
+                    </p>
                 </div>
             )}
         </div>
